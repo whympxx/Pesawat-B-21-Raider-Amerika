@@ -1,0 +1,1837 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>B-21 Raider 3D</title>
+<meta name="description" content="Penampil struktur 3D interaktif pesawat pembom siluman B-21 Raider (model ilustratif)." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<div id="viewport"></div>
+<div id="loading">MEMUAT MODEL 3D…</div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 32 32" width="22" height="22" fill="none" stroke="#4fb3ff" stroke-width="1.6" stroke-linejoin="round">
+        <path d="M16 6 L30 20 L25 19 L21 22 L16 19 L11 22 L7 19 L2 20 Z" />
+      </svg>
+    </div>
+    <div>
+      <div class="brand-title">B-21 RAIDER</div>
+      <div class="brand-sub">Penampil Struktur 3D · Model Ilustratif</div>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="seg" id="modeSeg">
+    <button data-mode="solid" class="active">Solid</button>
+    <button data-mode="xray">X-Ray</button>
+    <button data-mode="wire">Wireframe</button>
+    <button data-mode="color">Warna Sistem</button>
+  </div>
+  <button class="icon-btn only-mobile" id="btnParts" title="Komponen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+  <button class="icon-btn only-mobile" id="btnSide" title="Kontrol">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>
+  </button>
+</header>
+
+<div class="hint">Seret untuk memutar · Scroll untuk zoom · Klik kanan untuk geser · Klik komponen untuk detail</div>
+
+<!-- Left: parts tree -->
+<aside class="panel left" id="partsPanel">
+  <div class="panel-head">
+    <h2>Komponen</h2>
+    <button class="icon-btn" id="btnShowAll" style="height:26px;font-size:11px">Tampilkan semua</button>
+  </div>
+  <label class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="search" type="text" placeholder="Cari komponen…" autocomplete="off" />
+  </label>
+  <div class="panel-body" id="tree"></div>
+  <div class="panel-foot"><span id="statParts">0 komponen</span><span id="statTris">0 segitiga</span></div>
+</aside>
+
+<!-- Right: info + controls -->
+<aside class="panel right" id="sidePanel">
+  <div class="panel-body" style="padding:0">
+    <div class="section">
+      <h3>Simulasi Misi</h3>
+      <div class="mission">
+        <button class="icon-btn primary" id="btnFly">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 4 22 14l-4-.5-3 2.5-3-2-3 2-3-2.5L2 14Z"/></svg>
+          <span>Lepas Landas</span>
+        </button>
+        <button class="icon-btn danger" id="btnFire">Luncurkan <b id="ammo">8/8</b></button>
+        <button class="icon-btn" id="btnSalvo">Salvo (semua)</button>
+        <button class="icon-btn" id="btnReload" style="grid-column:1/-1">Isi Ulang Senjata</button>
+      </div>
+      <div class="kbd-hint"><kbd>T</kbd> terbang / mendarat · <kbd>Spasi</kbd> luncurkan · <kbd>R</kbd> isi ulang</div>
+      <div class="kbd-hint">Saat terbang, kota muncul di bawah jalur. Gedung dekat titik ledak runtuh, gedung di zona luar miring &amp; hangus (efek visual bergaya game).</div>
+    </div>
+
+    <div class="section" id="info">
+      <h3>Detail Komponen</h3>
+      <div class="info-empty">Klik bagian pesawat atau pilih dari daftar untuk melihat detailnya.</div>
+    </div>
+
+    <div class="section">
+      <h3>Tampilan Struktur</h3>
+      <div class="ctl">
+        <div class="ctl-row"><span>Urai komponen (exploded view)</span><span class="ctl-val" id="explodeVal">0%</span></div>
+        <input type="range" id="explode" min="0" max="100" value="0" />
+      </div>
+      <div class="ctl">
+        <div class="ctl-row">
+          <span>Potongan penampang</span>
+          <select id="clipAxis">
+            <option value="off">Mati</option>
+            <option value="z">Memanjang</option>
+            <option value="x">Melintang</option>
+            <option value="y">Horizontal</option>
+          </select>
+        </div>
+        <input type="range" id="clip" min="0" max="100" value="50" disabled />
+      </div>
+      <div class="toggles">
+        <label class="toggle"><input type="checkbox" id="tLabels" /><span class="sw"></span>Label</label>
+        <label class="toggle"><input type="checkbox" id="tGear" checked /><span class="sw"></span>Roda turun</label>
+        <label class="toggle"><input type="checkbox" id="tBay" /><span class="sw"></span>Ruang bom</label>
+        <label class="toggle"><input type="checkbox" id="tEngine" /><span class="sw"></span>Mesin hidup</label>
+        <label class="toggle"><input type="checkbox" id="tRotate" /><span class="sw"></span>Putar otomatis</label>
+        <label class="toggle"><input type="checkbox" id="tGrid" checked /><span class="sw"></span>Grid lantai</label>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Spesifikasi Pesawat</h3>
+      <dl class="specs">
+        <dt>Pabrikan</dt><dd>Northrop Grumman</dd>
+        <dt>Peran</dt><dd>Pembom siluman strategis</dd>
+        <dt>Pengguna</dt><dd>US Air Force</dd>
+        <dt>Diperkenalkan</dt><dd>2 Des 2022</dd>
+        <dt>Terbang perdana</dt><dd>10 Nov 2023</dd>
+        <dt>Awak</dt><dd>2 (opsi tanpa awak)</dd>
+        <dt>Mesin</dt><dd>2× turbofan P&amp;W*</dd>
+        <dt>Bentang sayap</dt><dd>± 40 m*</dd>
+        <dt>Muatan</dt><dd>Konvensional &amp; nuklir</dd>
+        <dt>Rencana unit</dt><dd>≥ 100</dd>
+      </dl>
+      <div class="note">*Estimasi. Sebagian besar data teknis B-21 masih dirahasiakan. Model 3D ini adalah rekonstruksi ilustratif berdasarkan foto publik, bukan data resmi.</div>
+    </div>
+  </div>
+</aside>
+
+<nav class="viewbar">
+  <button class="icon-btn" data-view="iso">Isometrik</button>
+  <button class="icon-btn" data-view="top">Atas</button>
+  <button class="icon-btn" data-view="bottom">Bawah</button>
+  <button class="icon-btn" data-view="front">Depan</button>
+  <button class="icon-btn" data-view="side">Samping</button>
+  <button class="icon-btn" data-view="rear">Belakang</button>
+  <span class="divider"></span>
+  <button class="icon-btn" id="btnReset" title="Atur ulang tampilan">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Reset
+  </button>
+  <button class="icon-btn" id="btnShot" title="Simpan gambar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h3l2-3h6l2 3h3v13H4z"/><circle cx="12" cy="13" r="4"/></svg>Screenshot
+  </button>
+</nav>
+
+<div id="tooltip"></div>
+<div id="hud">
+  <span class="hud-status" id="hudStatus">PARKIR</span>
+  <span>ALT <b id="hudAlt">0</b> ft</span>
+  <span>KEC <b id="hudSpd">0</b> kn</span>
+  <span>SENJATA <b id="hudAmmo">8/8</b></span>
+</div>
+<div id="toast"></div>
+
+<script src="logo.js"></script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* =====================================================================
+   1. GEOMETRI DASAR: bentuk planform & profil sayap terbang (flying wing)
+   Sumbu: X = bentang (kanan +), Y = atas, Z = memanjang (hidung di +Z)
+   ===================================================================== */
+const HALF_SPAN = 21;     // setengah bentang (m)
+const KINK = 7.5;         // titik patahan trailing edge
+const NOSE_R = 1.5;       // radius pembulatan hidung
+const LE_SLOPE = 0.65;    // kemiringan leading edge (~33°)
+const TE_CENTER = -18.5;  // ujung ekor di garis tengah
+const TE_TIP = -15.4;
+const UP = 0.68, LO = 0.32; // pembagian ketebalan atas/bawah (profil asimetris)
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const smoothAbs = x => Math.sqrt(x * x + NOSE_R * NOSE_R) - NOSE_R;
+const TE_KINK = TE_CENTER + smoothAbs(KINK);
+
+function le(x) { return -LE_SLOPE * smoothAbs(Math.abs(x)); }
+function te(x) {
+  const a = Math.abs(x);
+  if (a <= KINK) return TE_CENTER + smoothAbs(a);
+  return TE_KINK + (TE_TIP - TE_KINK) * (a - KINK) / (HALF_SPAN - KINK);
+}
+function chord(x) { return le(x) - te(x); }
+function tRatio(x) {
+  const a = Math.abs(x);
+  if (a <= KINK) { const s = a / KINK; return 0.16 - 0.04 * s * s * (3 - 2 * s); }
+  return 0.12 - 0.045 * (a - KINK) / (HALF_SPAN - KINK);
+}
+// distribusi ketebalan NACA 4-digit (dinormalisasi, maks ≈ 1)
+function nf(u) {
+  u = clamp(u, 0, 1);
+  return 10 * (0.2969 * Math.sqrt(u) - 0.1260 * u - 0.3516 * u * u + 0.2843 * u ** 3 - 0.1036 * u ** 4);
+}
+function thick(x, u) { return nf(u) * tRatio(x) * chord(x); }
+function uAt(x, z) { return clamp((le(x) - z) / chord(x), 0, 1); }
+function upperAt(x, z) { return UP * thick(x, uAt(x, z)); }
+function lowerAt(x, z) { return -LO * thick(x, uAt(x, z)); }
+function midAt(x, z) { return (UP - LO) / 2 * thick(x, uAt(x, z)); }
+function zAt(x, u) { return le(x) - u * chord(x); }
+
+// titik pada permukaan sayap; k < 1 = mengecil ke dalam (untuk struktur internal)
+function P(x, u, upper, k = 1) {
+  const h = thick(x, u), mid = (UP - LO) / 2 * h;
+  const y = upper ? UP * h : -LO * h;
+  return [x, mid + (y - mid) * k, zAt(x, u)];
+}
+
+function linspace(a, b, n) { const r = []; for (let i = 0; i <= n; i++) r.push(a + (b - a) * i / n); return r; }
+function cosSpace(a, b, n) { const r = []; for (let i = 0; i <= n; i++) r.push(a + (b - a) * (0.5 - 0.5 * Math.cos(Math.PI * i / n))); return r; }
+
+function makeGeo(pos, idx) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+// Loft sayap: menyusun penampang airfoil di sepanjang stasiun bentang
+function loftGeometry(xs, u0, u1, nu, k = 1, caps = true) {
+  const us = u0 === 0 ? cosSpace(u0, u1, nu) : linspace(u0, u1, nu);
+  const ring = [];
+  for (let i = nu; i >= 0; i--) ring.push([us[i], true]);
+  for (let i = 0; i <= nu; i++) ring.push([us[i], false]);
+  const R = ring.length, pos = [], idx = [];
+  for (const x of xs) for (const [u, up] of ring) pos.push(...P(x, u, up, k));
+  for (let i = 0; i < xs.length - 1; i++) for (let j = 0; j < R; j++) {
+    const j2 = (j + 1) % R, a = i * R + j, b = i * R + j2, c = (i + 1) * R + j, d = (i + 1) * R + j2;
+    idx.push(a, c, b, b, c, d);
+  }
+  if (caps) for (const x of [xs[0], xs[xs.length - 1]]) {
+    const base = pos.length / 3; let cx = 0, cy = 0, cz = 0;
+    for (const [u, up] of ring) { const p = P(x, u, up, k); pos.push(...p); cx += p[0]; cy += p[1]; cz += p[2]; }
+    pos.push(cx / R, cy / R, cz / R);
+    for (let j = 0; j < R; j++) idx.push(base + R, base + j, base + (j + 1) % R);
+  }
+  return makeGeo(pos, idx);
+}
+
+// Grid parametrik umum: fn(s, t) -> [x,y,z]
+function paramGeo(fn, ns, nt) {
+  const pos = [], idx = [];
+  for (let i = 0; i <= ns; i++) for (let j = 0; j <= nt; j++) pos.push(...fn(i / ns, j / nt));
+  for (let i = 0; i < ns; i++) for (let j = 0; j < nt; j++) {
+    const a = i * (nt + 1) + j, b = a + 1, c = a + nt + 1, d = c + 1;
+    idx.push(a, c, b, b, c, d);
+  }
+  return makeGeo(pos, idx);
+}
+function fanGeo(pts, center) {
+  const pos = [...center], idx = [];
+  pts.forEach(p => pos.push(...p));
+  for (let i = 1; i < pts.length; i++) idx.push(0, i, i + 1);
+  return makeGeo(pos, idx);
+}
+// Panel yang mengikuti permukaan sayap
+function surfacePatch(x0, x1, z0, z1, off, upper = false) {
+  return paramGeo((s, t) => {
+    const x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * s;
+    return [x, (upper ? upperAt(x, z) : lowerAt(x, z)) + off, z];
+  }, 10, 6);
+}
+
+// "Punuk" yang menyatu ke permukaan atas (kokpit & nacelle mesin)
+function humpPoint(hp, s, th, off = 0) {
+  const z = hp.z0 + (hp.z1 - hp.z0) * s;
+  const w = hp.W * hp.wFn(s) + off, h = hp.H * hp.hFn(s);
+  const x = hp.xc + w * Math.cos(th);
+  const base = upperAt(x, z) - 0.06;
+  return [x, base + (h + 0.06 + off) * Math.pow(Math.max(0, Math.sin(th)), 0.55), z];
+}
+function humpGeo(hp, s0 = 0, s1 = 1, th0 = 0, th1 = Math.PI, off = 0, ns = 48, nt = 28) {
+  return paramGeo((a, b) => humpPoint(hp, s0 + (s1 - s0) * a, th0 + (th1 - th0) * b, off), ns, nt);
+}
+function humpCap(hp, s, recess) {
+  const pts = []; for (let j = 0; j <= 28; j++) pts.push(humpPoint(hp, s, Math.PI * j / 28, 0.005));
+  const z = hp.z0 + (hp.z1 - hp.z0) * s;
+  return fanGeo(pts, [hp.xc, upperAt(hp.xc, z) + hp.H * hp.hFn(s) * 0.35, z + recess]);
+}
+
+/* =====================================================================
+   2. SCENE
+   ===================================================================== */
+const viewport = document.getElementById('viewport');
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.localClippingEnabled = true;
+viewport.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(innerWidth, innerHeight);
+Object.assign(labelRenderer.domElement.style, { position: 'fixed', inset: '0', pointerEvents: 'none' });
+viewport.appendChild(labelRenderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1b1f25);
+scene.fog = new THREE.Fog(0x1b1f25, 90, 220);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 500);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxDistance = 160;
+controls.minDistance = 3;
+controls.maxPolarAngle = Math.PI * 0.95;
+
+scene.add(new THREE.HemisphereLight(0xdfe8f5, 0x5c5850, 0.9));
+const under = new THREE.DirectionalLight(0xb8c4d4, 0.7);
+under.position.set(5, -30, 10);
+scene.add(under);
+const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+sun.position.set(18, 40, 22);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 120 });
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.03;
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x9fb7d6, 0.6);
+fill.position.set(-20, 10, -25);
+scene.add(fill);
+
+const GROUND_Y = -3.0;
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), new THREE.ShadowMaterial({ opacity: 0.35 }));
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = GROUND_Y;
+ground.receiveShadow = true;
+scene.add(ground);
+const grid = new THREE.GridHelper(160, 80, 0x3a424d, 0x262c34);
+grid.position.y = GROUND_Y + 0.002;
+scene.add(grid);
+
+// rig = wadah untuk gerakan terbang (ketinggian, pitch, bank)
+const rig = new THREE.Group();
+scene.add(rig);
+const aircraft = new THREE.Group();
+aircraft.position.z = 8; // pusatkan pesawat di sekitar titik asal
+rig.add(aircraft);
+
+/* =====================================================================
+   3. REGISTRASI KOMPONEN & MATERIAL
+   ===================================================================== */
+const CATEGORIES = [
+  { id: 'airframe',   name: 'Rangka Udara & Kulit', color: '#8a96a3' },
+  { id: 'cockpit',    name: 'Kokpit',               color: '#4fb3ff' },
+  { id: 'propulsion', name: 'Propulsi',             color: '#ff6b4a' },
+  { id: 'structure',  name: 'Struktur Internal',    color: '#c9a66b' },
+  { id: 'control',    name: 'Permukaan Kendali',    color: '#b67dff' },
+  { id: 'gear',       name: 'Roda Pendarat',        color: '#ffd23f' },
+  { id: 'weapons',    name: 'Sistem Senjata',       color: '#ff3d7f' },
+  { id: 'fuel',       name: 'Bahan Bakar',          color: '#3ddc97' },
+  { id: 'avionics',   name: 'Avionik & Sensor',     color: '#3de0e0' },
+];
+const catById = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
+
+/* ---- Tekstur cat badan: abu-abu terang, garis panel, stensil, kotoran knalpot ----
+   Diproyeksikan dari atas (planform): u = bentang, v = memanjang. */
+const PLAN = { x0: 21.5, z0: 0.5, w: 43, h: 19.5 };
+function planUV(geo) {
+  const p = geo.attributes.position, uv = [];
+  for (let i = 0; i < p.count; i++) uv.push((PLAN.x0 - p.getX(i)) / PLAN.w, 1 - (PLAN.z0 - p.getZ(i)) / PLAN.h);
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+}
+function makeSkinTextures() {
+  const TW = 2048, TH = Math.round(TW * PLAN.h / PLAN.w), S = TW / PLAN.w; // S = piksel per meter
+  const mk = () => { const c = document.createElement('canvas'); c.width = TW; c.height = TH; return c; };
+  const col = mk(), bmp = mk(), c = col.getContext('2d'), b = bmp.getContext('2d');
+  const X = x => (PLAN.x0 - x) * S, Y = z => (PLAN.z0 - z) * S;
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+  // dasar + variasi warna lembut
+  c.fillStyle = '#c3c7cb'; c.fillRect(0, 0, TW, TH);
+  b.fillStyle = '#fff'; b.fillRect(0, 0, TW, TH);
+  for (let i = 0; i < 140; i++) {
+    const x = rnd() * TW, y = rnd() * TH, r = 40 + rnd() * 220, dark = rnd() < 0.5;
+    const g = c.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, dark ? 'rgba(120,128,140,0.07)' : 'rgba(255,255,255,0.10)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+
+  // garis panel (warna + bump)
+  const stroke = (pts, close = false, w = 1.6) => {
+    for (const [ctx, st, lw] of [[c, 'rgba(70,76,84,0.55)', w], [b, '#404040', w + 0.6]]) {
+      ctx.beginPath(); pts.forEach(([x, z], i) => i ? ctx.lineTo(X(x), Y(z)) : ctx.moveTo(X(x), Y(z)));
+      if (close) ctx.closePath();
+      ctx.strokeStyle = st; ctx.lineWidth = lw; ctx.stroke();
+    }
+  };
+  const along = (fn, a, b2, n = 60) => linspace(a, b2, n).map(x => [x, fn(x)]);
+  const rect = (x0, z0, x1, z1, w) => stroke([[x0, z0], [x1, z0], [x1, z1], [x0, z1]], true, w);
+
+  for (const s of [1, -1]) {
+    stroke(along(x => le(x) - 0.75, s * 1.2, s * 21));                 // strip leading edge
+    stroke(along(x => te(x) + 1.7, s * 8.1, s * 20.6));                // garis engsel elevon
+    for (const xs of [2.3, 5.2, KINK, 11, 14.45, 17.8]) {              // sambungan memanjang
+      const x = s * xs; stroke([[x, le(x) - 0.75], [x, te(x) + (xs > 8 ? 1.7 : 0.05)]]);
+    }
+    for (const [xa, xb, f] of [[KINK, 21, 0.42], [2.3, KINK, 0.5], [5.2, KINK, 0.25]])   // sambungan melintang
+      stroke(along(x => le(x) - chord(x) * f, s * xa, s * xb, 20));
+    // panel akses kecil
+    for (const [xx, zz, w, h] of [[9.2, -8.6, 0.9, 0.6], [12.5, -7.4, 0.6, 0.6], [16.2, -11.6, 0.8, 0.5], [6.2, -5.3, 0.7, 0.9], [19.1, -13.3, 0.5, 0.4]])
+      rect(s * xx, zz, s * (xx + w), zz - h, 1.2);
+  }
+  stroke([[0, -1.6], [0, te(0) + 0.05]]);                             // garis tengah
+  rect(-0.8, -15.2, 0.8, -16.6, 1.3);                                  // hatch belakang
+
+  // stensil "NO STEP" & blok teks kecil
+  c.fillStyle = 'rgba(80,86,94,0.75)'; c.textAlign = 'center';
+  const txt = (s, x, z, size = 0.22, rot = 0) => {
+    c.save(); c.translate(X(x), Y(z)); c.rotate(rot); c.font = `600 ${size * S}px Arial`; c.fillText(s, 0, 0); c.restore();
+  };
+  const lines = (x, z, n = 3) => { for (let i = 0; i < n; i++) c.fillRect(X(x) - 0.45 * S, Y(z) + i * 0.13 * S, (0.5 + rnd() * 0.4) * S, 0.05 * S); };
+  for (const s of [1, -1]) {
+    txt('NO STEP', s * 9.9, -10.6); txt('NO STEP', s * 15.6, -12.7, 0.18);
+    txt('NO STEP', s * 4.0, -16.4, 0.18);
+    for (const [x, z] of [[10.3, -9.4], [13.2, -9.6], [17.3, -13.2], [6.4, -14.6], [3.2, -2.6], [19.6, -14.6], [11.6, -14.4]]) lines(s * x, z);
+    // walkway bergaris (seperti blok arsir di referensi)
+    for (const dx of [-0.32, 0.32]) {
+      const x0 = X(s * 9.9 + dx) - 0.12 * S, y0 = Y(-6.9), w = 0.24 * S, h = 1.6 * S;
+      c.save(); c.beginPath(); c.rect(x0, y0, w, h); c.clip();
+      c.strokeStyle = 'rgba(80,86,94,0.7)'; c.lineWidth = 1.4;
+      for (let k = -20; k < 60; k++) { c.beginPath(); c.moveTo(x0, y0 + k * 4); c.lineTo(x0 + w, y0 + k * 4 + w); c.stroke(); }
+      c.restore(); c.strokeRect(x0, y0, w, h);
+    }
+  }
+
+  // roundel low-visibility (bintang & bar abu-abu)
+  const roundel = (x, z, r) => {
+    const px = X(x), py = Y(z), R = r * S;
+    c.fillStyle = 'rgba(122,128,136,0.9)';
+    c.fillRect(px - R * 2, py - R * 0.32, R * 4, R * 0.64);
+    c.beginPath(); c.arc(px, py, R, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#c3c7cb';
+    c.fillRect(px - R * 1.85, py - R * 0.1, R * 0.75, R * 0.2); c.fillRect(px + R * 1.1, py - R * 0.1, R * 0.75, R * 0.2);
+    c.beginPath();
+    for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? R * 0.36 : R * 0.92; c.lineTo(px + Math.cos(a) * rr, py + Math.sin(a) * rr); }
+    c.closePath(); c.fill();
+  };
+  roundel(12.6, -10.2, 0.62); roundel(-12.6, -10.2, 0.62);
+
+  // kotoran / jelaga di sekitar knalpot & ekor
+  for (const s of [1, -1]) {
+    const ex = s * 3.4;
+    for (let i = 0; i < 26; i++) {
+      const x = X(ex + (rnd() - 0.5) * 2.6), y = Y(-14.6 - rnd() * 3.4), r = (0.3 + rnd() * 0.9) * S;
+      const g = c.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(88,78,64,0.16)'); g.addColorStop(1, 'rgba(88,78,64,0)');
+      c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    c.fillStyle = 'rgba(70,58,44,0.45)';
+    for (let i = 0; i < 260; i++) {
+      const x = X(ex + (rnd() - 0.5) * 2.8), y = Y(-14.2 - rnd() * 3.8), r = rnd() * 1.3 + 0.3;
+      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    }
+  }
+  // noda halus tersebar
+  c.fillStyle = 'rgba(90,92,96,0.18)';
+  for (let i = 0; i < 900; i++) { c.beginPath(); c.arc(rnd() * TW, rnd() * TH, rnd() * 1.4 + 0.3, 0, Math.PI * 2); c.fill(); }
+
+  const map = new THREE.CanvasTexture(col);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const bump = new THREE.CanvasTexture(bmp);
+  bump.anisotropy = map.anisotropy;
+  return { map, bump };
+}
+const skinTex = makeSkinTextures();
+
+const M = {
+  skin:   { color: 0xffffff, metalness: 0.15, roughness: 0.62, skin: true, plan: true },
+  skin2:  { color: 0xf2f3f4, metalness: 0.15, roughness: 0.64, skin: true, plan: true },
+  glass:  { color: 0x0a1018, metalness: 0.2, roughness: 0.04, glass: true, skin: true },
+  dark:   { color: 0x08090b, metalness: 0.0, roughness: 0.95, skin: true },
+  bay:    { color: 0x1a1d21, metalness: 0.1, roughness: 0.9, skin: true },
+  metal:  { color: 0xa3aab2, metalness: 0.85, roughness: 0.32 },
+  hot:    { color: 0x6e5a4a, metalness: 0.8, roughness: 0.45 },
+  titan:  { color: 0x7d7870, metalness: 0.8, roughness: 0.4 },
+  rubber: { color: 0x151515, metalness: 0.0, roughness: 0.92 },
+  struct: { color: 0x9aa9b8, metalness: 0.45, roughness: 0.5 },
+  comp:   { color: 0xb59e72, metalness: 0.1, roughness: 0.7 },
+  tank:   { color: 0xc98a3a, metalness: 0.25, roughness: 0.55 },
+  bomb:   { color: 0x5f6a4a, metalness: 0.3, roughness: 0.6 },
+  avi:    { color: 0x2f3a44, metalness: 0.4, roughness: 0.5 },
+  pcb:    { color: 0x2a7a5a, metalness: 0.2, roughness: 0.6 },
+  radar:  { color: 0x6b6f3c, metalness: 0.3, roughness: 0.5 },
+  seat:   { color: 0x2b2e33, metalness: 0.1, roughness: 0.8 },
+  screen: { color: 0x0d2a3a, metalness: 0.1, roughness: 0.2, emissive: 0x0a3550 },
+  door:   { color: 0xc6c9cc, metalness: 0.15, roughness: 0.62, skin: true },
+};
+
+const parts = [];
+const partById = {};
+const matRecords = [];
+const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+
+function makeMat(part, o, extra = {}) {
+  const opts = { ...o, ...extra };
+  const P2 = {
+    color: opts.color, metalness: opts.metalness, roughness: opts.roughness,
+    side: THREE.DoubleSide,
+  };
+  if (opts.emissive) P2.emissive = new THREE.Color(opts.emissive);
+  if (opts.polygonOffset) Object.assign(P2, { polygonOffset: true, polygonOffsetFactor: opts.polygonOffset, polygonOffsetUnits: opts.polygonOffset });
+  if (opts.map) Object.assign(P2, { map: opts.map, alphaTest: 0.35 });
+  if (opts.plan) Object.assign(P2, { map: skinTex.map, bumpMap: skinTex.bump, bumpScale: 0.5 });
+  const mat = opts.glass
+    ? new THREE.MeshPhysicalMaterial({ ...P2, clearcoat: 1, clearcoatRoughness: 0.05 })
+    : new THREE.MeshStandardMaterial(P2);
+  const rec = {
+    mat, part,
+    baseColor: new THREE.Color(opts.color),
+    baseEmissive: mat.emissive.clone(),
+    skin: !!opts.skin,
+    keepColor: !!opts.map,
+  };
+  matRecords.push(rec);
+  part.mats.push(rec);
+  return mat;
+}
+
+function addPart(def, build) {
+  const group = new THREE.Group();
+  group.name = def.id;
+  aircraft.add(group);
+  const part = { ...def, group, mats: [], pieces: [], anim: {} };
+  part.piece = (explode = [0, 0, 0]) => {
+    const g = new THREE.Group();
+    g.userData.explode = new THREE.Vector3(...explode);
+    group.add(g); part.pieces.push(g);
+    return g;
+  };
+  part.mesh = (parent, geo, matOpts, extra) => {
+    if ((matOpts.plan || extra?.plan) && !geo.attributes.uv) planUV(geo);
+    const m = new THREE.Mesh(geo, makeMat(part, matOpts, extra));
+    m.castShadow = true; m.receiveShadow = true;
+    parent.add(m);
+    return m;
+  };
+  build(part);
+  group.traverse(o => { if (o.isMesh) o.userData.partId = def.id; });
+
+  // label menempel ke potongan pertama (sisi kanan untuk komponen berpasangan)
+  const anchorObj = part.pieces[0] || group;
+  const box = new THREE.Box3().setFromObject(anchorObj);
+  const center = box.getCenter(new THREE.Vector3());
+  anchorObj.worldToLocal(center);
+  const el = document.createElement('div');
+  el.className = 'label3d';
+  el.innerHTML = `<i style="background:${catById[def.cat].color}"></i>${def.name}`;
+  el.addEventListener('click', e => { e.stopPropagation(); selectPart(def.id, true); });
+  const label = new CSS2DObject(el);
+  label.position.copy(center);
+  label.position.y = box.max.y + 0.2;
+  label.visible = false;
+  anchorObj.add(label);
+  part.label = label;
+
+  parts.push(part);
+  partById[def.id] = part;
+  return part;
+}
+
+/* =====================================================================
+   4. MEMBANGUN MODEL B-21
+   ===================================================================== */
+
+// ---- Rangka udara ----
+addPart({
+  id: 'center-body', cat: 'airframe', name: 'Badan Tengah (Blended Wing Body)',
+  desc: 'Bagian inti sayap terbang yang menyatu dengan badan. Menampung kokpit, ruang senjata, mesin tertanam, dan sebagian besar bahan bakar. Bentuk tanpa ekor vertikal mengurangi pantulan radar.',
+  specs: [['Lebar (model)', '15 m'], ['Panjang akar', '18,5 m'], ['Material', 'Komposit karbon + RAM'], ['Rasio tebal', '≈ 16%']],
+}, p => {
+  p.mesh(p.piece(), loftGeometry(linspace(-KINK, KINK, 64), 0, 1, 44), M.skin);
+});
+
+addPart({
+  id: 'outer-wings', cat: 'airframe', name: 'Sayap Luar Kiri & Kanan',
+  desc: 'Panel sayap luar dengan leading edge lurus tersapu ±33°. Trailing edge berpola gerigi (sawtooth) diselaraskan dengan sudut leading edge agar pantulan radar terkumpul di beberapa arah sempit saja.',
+  specs: [['Sapuan LE', '≈ 33°'], ['Panjang per sisi (model)', '13,5 m'], ['Chord ujung', '2,7 m'], ['Rasio tebal', '12% → 7,5%']],
+}, p => {
+  p.mesh(p.piece([7, 0, 0]), loftGeometry(linspace(KINK, HALF_SPAN, 44), 0, 1, 40), M.skin);
+  p.mesh(p.piece([-7, 0, 0]), loftGeometry(linspace(-HALF_SPAN, -KINK, 44), 0, 1, 40), M.skin);
+});
+
+// ---- Logo livery di punggung badan tengah ----
+// logo diberi outline gelap tipis agar tetap terbaca di atas cat abu-abu terang
+let logoTex = null;
+if (window.WHYXX_LOGO) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 1024;
+  logoTex = new THREE.CanvasTexture(cv);
+  const img = new Image();
+  img.onload = () => {
+    const g = cv.getContext('2d');
+    g.shadowColor = 'rgba(18,24,34,0.95)'; g.shadowBlur = 5;
+    for (const [dx, dy] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) { g.shadowOffsetX = dx; g.shadowOffsetY = dy; g.drawImage(img, 0, 0, 1024, 1024); }
+    g.shadowColor = 'transparent'; g.drawImage(img, 0, 0, 1024, 1024);
+    logoTex.needsUpdate = true;
+  };
+  img.src = window.WHYXX_LOGO;
+}
+if (logoTex) {
+  logoTex.colorSpace = THREE.SRGBColorSpace;
+  logoTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  addPart({
+    id: 'logo', cat: 'airframe', name: 'Logo Whyxx (Livery)',
+    desc: 'Desain logo Whyxx · Fullstack Developer yang ditempel sebagai decal livery di punggung badan tengah, di antara kedua fairing mesin.',
+    specs: [['Ukuran', '3,9 × 3,9 m'], ['Lokasi', 'Punggung badan tengah'], ['Jenis', 'Decal livery']],
+  }, p => {
+    const X0 = 1.95, X1 = -1.95, Z0 = -10.1, Z1 = -14.0, N = 18;
+    const pos = [], uv = [], idx = [];
+    for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
+      const s = i / N, t = j / N, x = X0 + (X1 - X0) * t, z = Z0 + (Z1 - Z0) * s;
+      pos.push(x, upperAt(x, z) + 0.012, z);
+      uv.push(t, 1 - s);
+    }
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const a = i * (N + 1) + j, b = a + 1, c = a + N + 1, d = c + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+    const geo = makeGeo(pos, idx);
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    p.mesh(p.piece(), geo, { color: 0xffffff, metalness: 0.3, roughness: 0.45, map: logoTex, skin: true, polygonOffset: -3 });
+  });
+}
+
+const NACELLE_X = 3.4;
+const nacelleHP = sx => ({
+  xc: sx * NACELLE_X, z0: -4.2, z1: -15.0, W: 1.35, H: 0.75,
+  hFn: s => s < 0.08 ? 0.8 + 0.2 * s / 0.08 : 1 - 0.8 * Math.pow((s - 0.08) / 0.92, 1.6),
+  wFn: s => s < 0.08 ? 0.9 + 0.1 * s / 0.08 : 1 - 0.35 * Math.pow((s - 0.08) / 0.92, 2),
+});
+addPart({
+  id: 'nacelles', cat: 'airframe', name: 'Fairing Nacelle Mesin',
+  desc: 'Punuk aerodinamis di atas badan yang menutupi mesin tertanam. Mesin ditempatkan di atas sayap sehingga panas & suara knalpot terhalang dari sensor di darat.',
+  specs: [['Jumlah', '2'], ['Panjang', '10,8 m'], ['Lebar', '2,7 m'], ['Tinggi di atas kulit', '0,75 m']],
+}, p => {
+  for (const sx of [1, -1]) p.mesh(p.piece([sx * 1.5, 3.5, 0]), humpGeo(nacelleHP(sx)), M.skin);
+});
+
+// ---- Kokpit ----
+const cockpitHP = {
+  xc: 0, z0: -0.6, z1: -9.8, W: 1.55, H: 0.95,
+  hFn: s => Math.pow(Math.sin(Math.PI * Math.pow(s, 0.72)), 0.7),
+  wFn: s => 0.3 + 0.7 * Math.pow(Math.sin(Math.PI * Math.pow(s, 0.8)), 0.5),
+};
+addPart({
+  id: 'canopy', cat: 'cockpit', name: 'Punuk Kokpit & Kaca Depan',
+  desc: 'Fairing kokpit yang menyatu dengan badan. Kaca depan berbentuk segmen memiliki lapisan tipis logam (indium-tin oxide) agar gelombang radar tidak masuk ke dalam kokpit yang penuh sudut tajam.',
+  specs: [['Jendela', '4 panel + 2 samping'], ['Lapisan', 'ITO konduktif'], ['Tinggi punuk', '0,95 m']],
+}, p => {
+  const g = p.piece([0, 3, 1]);
+  p.mesh(g, humpGeo(cockpitHP), M.skin);
+  const glass = (s0, s1, t0, t1) => p.mesh(g, humpGeo(cockpitHP, s0, s1, t0, t1, 0.012, 10, 10), M.glass, { polygonOffset: -2 });
+  glass(0.13, 0.31, 0.62, 1.52);
+  glass(0.13, 0.31, Math.PI - 1.52, Math.PI - 0.62);
+  glass(0.31, 0.43, 0.32, 0.88);
+  glass(0.31, 0.43, Math.PI - 0.88, Math.PI - 0.32);
+});
+
+addPart({
+  id: 'cockpit-interior', cat: 'cockpit', name: 'Kursi Awak & Panel Instrumen',
+  desc: 'Kokpit dua awak (pilot & komandan misi) dengan kursi lontar dan layar kaca besar (glass cockpit). B-21 dirancang "optionally manned" — dapat diterbangkan tanpa awak.',
+  specs: [['Awak', '2'], ['Kursi', 'Kursi lontar ACES 5*'], ['Tampilan', 'Layar sentuh lebar']],
+}, p => {
+  const g = p.piece([0, 6, 2]);
+  const floorY = 1.25;
+  p.mesh(g, new THREE.BoxGeometry(2.2, 0.06, 4.2).translate(0, floorY, -4.6), M.avi);
+  for (const sx of [-0.5, 0.5]) {
+    p.mesh(g, new THREE.BoxGeometry(0.55, 0.12, 0.6).translate(sx, floorY + 0.45, -5.0), M.seat);
+    p.mesh(g, new THREE.BoxGeometry(0.55, 0.85, 0.12).rotateX(-0.25).translate(sx, floorY + 0.9, -5.35), M.seat);
+    p.mesh(g, new THREE.BoxGeometry(0.3, 0.42, 0.3).translate(sx, floorY + 0.21, -5.0), M.metal);
+    p.mesh(g, new THREE.BoxGeometry(0.34, 0.2, 0.1).translate(sx, floorY + 1.3, -5.45), M.seat);
+  }
+  const panel = p.mesh(g, new THREE.BoxGeometry(1.9, 0.45, 0.12), M.avi);
+  panel.position.set(0, floorY + 0.95, -3.55); panel.rotation.x = -0.45;
+  for (const sx of [-0.62, -0.2, 0.2, 0.62]) {
+    const s = p.mesh(panel, new THREE.BoxGeometry(0.36, 0.3, 0.02), M.screen);
+    s.position.set(sx, 0, 0.07);
+  }
+});
+
+// ---- Propulsi ----
+addPart({
+  id: 'engines', cat: 'propulsion', name: 'Mesin Turbofan',
+  desc: 'Dua mesin turbofan Pratt & Whitney yang tertanam di dalam badan. Penempatan dalam badan menyembunyikan bilah kipas (fan) dari radar dan menurunkan jejak inframerah.',
+  specs: [['Jumlah', '2'], ['Pabrikan', 'Pratt & Whitney'], ['Tipe', 'Turbofan tanpa afterburner'], ['Panjang (model)', '5 m'], ['Diameter (model)', '1,1 m']],
+}, p => {
+  p.anim.fans = [];
+  for (const sx of [1, -1]) {
+    const g = p.piece([sx * 3.5, 4.5, 0]);
+    const eg = new THREE.Group(); eg.position.set(sx * NACELLE_X, 0.45, -9.1); g.add(eg);
+    p.mesh(eg, new THREE.CylinderGeometry(0.56, 0.48, 5, 36, 1, true).rotateX(Math.PI / 2), M.metal);
+    p.mesh(eg, new THREE.CylinderGeometry(0.3, 0.26, 4.4, 24).rotateX(Math.PI / 2), M.titan);
+    for (let i = 0; i < 6; i++) {
+      const r = p.mesh(eg, new THREE.TorusGeometry(0.55 - i * 0.012, 0.035, 8, 40), M.titan);
+      r.position.z = 1.9 - i * 0.75;
+    }
+    p.mesh(eg, new THREE.CylinderGeometry(0.46, 0.34, 0.7, 32, 1, true).rotateX(Math.PI / 2).translate(0, 0, -2.85), M.hot);
+    const fan = new THREE.Group(); fan.position.z = 2.35; eg.add(fan);
+    p.mesh(fan, new THREE.ConeGeometry(0.17, 0.4, 24).rotateX(Math.PI / 2).translate(0, 0, 0.12), M.metal);
+    for (let i = 0; i < 20; i++) {
+      const piv = new THREE.Group(); piv.rotation.z = i / 20 * Math.PI * 2; fan.add(piv);
+      const b = p.mesh(piv, new THREE.BoxGeometry(0.09, 0.36, 0.02), M.titan);
+      b.position.y = 0.33; b.rotation.y = 0.55;
+    }
+    p.anim.fans.push(fan);
+  }
+});
+
+addPart({
+  id: 'intakes', cat: 'propulsion', name: 'Saluran Masuk Udara (S-Duct)',
+  desc: 'Inlet di atas badan dengan saluran berbentuk S yang berkelok. Lekukan ini membuat gelombang radar tidak bisa "melihat" langsung ke bilah kipas mesin.',
+  specs: [['Jumlah', '2'], ['Tipe', 'Inlet atas, S-duct'], ['Panjang saluran', '≈ 2,5 m']],
+}, p => {
+  for (const sx of [1, -1]) {
+    const g = p.piece([sx * 3, 6, 2]);
+    const hp = nacelleHP(sx);
+    p.mesh(g, humpCap(hp, 0, -0.6), M.dark);
+    const iy = upperAt(sx * NACELLE_X, -4.2) + 0.3;
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(sx * NACELLE_X, iy - 0.05, -4.85),
+      new THREE.Vector3(sx * NACELLE_X, iy - 0.3, -5.4),
+      new THREE.Vector3(sx * NACELLE_X, 0.6, -6.0),
+      new THREE.Vector3(sx * NACELLE_X, 0.45, -6.6),
+    ]);
+    p.mesh(g, new THREE.TubeGeometry(curve, 32, 0.4, 20, false), M.struct);
+  }
+});
+
+addPart({
+  id: 'exhausts', cat: 'propulsion', name: 'Saluran & Nosel Buang',
+  desc: 'Gas buang disalurkan ke nosel datar di bagian atas belakang. Udara panas dicampur udara dingin dan dilindungi oleh permukaan sayap sehingga jejak panas sulit dideteksi dari bawah.',
+  specs: [['Tipe nosel', 'Datar / tersembunyi'], ['Material', 'Komposit keramik tahan panas']],
+}, p => {
+  for (const sx of [1, -1]) {
+    const g = p.piece([sx * 3, 5, -3]);
+    p.mesh(g, humpCap(nacelleHP(sx), 1, 0.5), M.dark);
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(sx * NACELLE_X, 0.45, -11.5),
+      new THREE.Vector3(sx * NACELLE_X, 0.4, -13.0),
+      new THREE.Vector3(sx * NACELLE_X, 0.32, -14.5),
+    ]);
+    p.mesh(g, new THREE.TubeGeometry(curve, 24, 0.34, 18, false), M.hot);
+  }
+});
+
+// ---- Struktur internal ----
+addPart({
+  id: 'spars', cat: 'structure', name: 'Spar Depan & Belakang',
+  desc: 'Balok utama memanjang sepanjang bentang yang menahan beban lentur sayap. Spar depan di ±18% chord dan spar belakang di ±70% chord.',
+  specs: [['Jumlah', '2 per sisi'], ['Posisi', '18% & 70% chord'], ['Material', 'Komposit karbon']],
+}, p => {
+  const spar = (xs, u) => {
+    const pos = [], idx = [];
+    xs.forEach((x, i) => {
+      pos.push(...P(x, u, true, 0.93), ...P(x, u, false, 0.93));
+      if (i) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    });
+    return makeGeo(pos, idx);
+  };
+  for (const sx of [1, -1]) {
+    const g = p.piece([sx * 4, 0, 0]);
+    const xs = linspace(5.4, HALF_SPAN - 0.6, 36).map(x => x * sx);
+    p.mesh(g, spar(xs, 0.18), M.comp);
+    p.mesh(g, spar(xs, 0.7), M.comp);
+  }
+});
+
+addPart({
+  id: 'ribs', cat: 'structure', name: 'Rusuk Sayap (Ribs)',
+  desc: 'Rusuk berbentuk airfoil yang menjaga profil sayap dan menyalurkan beban dari kulit ke spar. Lubang peringan mengurangi berat sekaligus jalur kabel & pipa bahan bakar.',
+  specs: [['Jumlah (model)', '20'], ['Jarak', '1,5 m'], ['Material', 'Paduan titanium / komposit']],
+}, p => {
+  for (const sx of [1, -1]) {
+    const g = p.piece([sx * 3.5, 0, 0]);
+    for (let x = 6; x <= 19.6; x += 1.5) {
+      const us = cosSpace(0.01, 0.97, 30);
+      const shape = new THREE.Shape();
+      us.forEach((u, i) => { const q = P(x, u, true, 0.92); i ? shape.lineTo(q[2], q[1]) : shape.moveTo(q[2], q[1]); });
+      [...us].reverse().forEach(u => { const q = P(x, u, false, 0.92); shape.lineTo(q[2], q[1]); });
+      for (const u of [0.32, 0.5, 0.62]) {
+        const z = zAt(x, u), m = midAt(x, z), r = thick(x, u) * 0.22;
+        const hole = new THREE.Path(); hole.absarc(z, m, r, 0, Math.PI * 2, true); shape.holes.push(hole);
+      }
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.05, bevelEnabled: false, curveSegments: 10 });
+      const rib = p.mesh(g, geo, M.struct);
+      rib.rotation.y = -Math.PI / 2;
+      rib.position.x = sx * x;
+    }
+  }
+});
+
+// ---- Permukaan kendali ----
+addPart({
+  id: 'elevons', cat: 'control', name: 'Elevon & Spoiler-Rudder',
+  desc: 'Permukaan kendali di trailing edge yang menggabungkan fungsi elevator dan aileron. Karena tidak ada ekor vertikal, kendali yaw dilakukan dengan membelah elevon terluar (split drag-rudder).',
+  specs: [['Jumlah', '4 (2 per sisi)'], ['Aktuator', 'Fly-by-wire elektro-hidraulik'], ['Kendali yaw', 'Drag-rudder terbelah']],
+}, p => {
+  for (const sx of [1, -1]) {
+    const g = p.piece([sx * 8, -1.2, -2]);
+    for (const [a, b] of [[8.3, 14.3], [14.6, 20.4]]) {
+      const xs = linspace(a, b, 16).map(x => x * sx);
+      if (sx < 0) xs.reverse();
+      p.mesh(g, loftGeometry(xs, 0.78, 1, 8, 1.03), M.skin2, { polygonOffset: -2 });
+    }
+  }
+});
+
+addPart({
+  id: 'beavertail', cat: 'control', name: 'Permukaan Kendali Tengah',
+  desc: 'Panel kendali di ekor tengah (gust load alleviation surface) untuk menstabilkan pitch dan meredam guncangan turbulensi.',
+  specs: [['Lebar', '4,4 m'], ['Fungsi', 'Trim pitch & peredam guncangan']],
+}, p => {
+  p.mesh(p.piece([0, -1, -3.5]), loftGeometry(linspace(-2.2, 2.2, 14), 0.9, 1, 6, 1.03), M.skin2, { polygonOffset: -2 });
+});
+
+// ---- Roda pendarat ----
+function buildGear(p, parent, pos, L, r, wheelXs) {
+  const pivot = new THREE.Group(); pivot.position.copy(pos); parent.add(pivot);
+  p.mesh(pivot, new THREE.CylinderGeometry(0.13, 0.13, L * 0.65, 16).translate(0, -L * 0.325, 0), M.metal);
+  p.mesh(pivot, new THREE.CylinderGeometry(0.095, 0.095, L * 0.45, 16).translate(0, -L * 0.75, 0), M.metal);
+  p.mesh(pivot, new THREE.CylinderGeometry(0.17, 0.17, 0.12, 16).translate(0, -L * 0.62, 0), M.titan);
+  const span = Math.abs(wheelXs[0]) * 2 + 0.1;
+  p.mesh(pivot, new THREE.CylinderGeometry(0.07, 0.07, span, 12).rotateZ(Math.PI / 2).translate(0, -L, 0), M.metal);
+  const brace = p.mesh(pivot, new THREE.BoxGeometry(0.08, L * 0.62, 0.08), M.titan);
+  brace.position.set(0, -L * 0.3, 0.35); brace.rotation.x = -0.4;
+  for (const wx of wheelXs) {
+    p.mesh(pivot, new THREE.CylinderGeometry(r, r, r * 0.6, 28).rotateZ(Math.PI / 2).translate(wx, -L, 0), M.rubber);
+    p.mesh(pivot, new THREE.CylinderGeometry(r * 0.55, r * 0.55, r * 0.62, 20).rotateZ(Math.PI / 2).translate(wx, -L, 0), M.metal);
+  }
+  return pivot;
+}
+const NOSE_GEAR = { x: 0, z: -4.5 };
+const MAIN_GEAR = { x: 4.6, z: -9.0 };
+addPart({
+  id: 'nose-gear', cat: 'gear', name: 'Roda Pendarat Depan',
+  desc: 'Roda hidung ganda yang dapat dikemudikan, terlipat ke belakang ke dalam ruang roda di bawah kokpit.',
+  specs: [['Roda', '2'], ['Lipatan', 'Ke belakang'], ['Kemudi', 'Steer-by-wire']],
+}, p => {
+  const g = p.piece([0, -3, 1.5]);
+  const py = lowerAt(0, NOSE_GEAR.z) + 0.6, r = 0.38;
+  p.anim.pivot = buildGear(p, g, new THREE.Vector3(0, py, NOSE_GEAR.z), py - GROUND_Y - r, r, [-0.22, 0.22]);
+  p.anim.dir = 1;
+});
+addPart({
+  id: 'main-gear', cat: 'gear', name: 'Roda Pendarat Utama',
+  desc: 'Dua kaki roda utama dengan peredam kejut oleo-pneumatik. Terlipat ke depan ke dalam ruang roda di samping ruang senjata.',
+  specs: [['Kaki', '2'], ['Roda per kaki', '2'], ['Lipatan', 'Ke depan'], ['Peredam', 'Oleo-pneumatik']],
+}, p => {
+  p.anim.pivots = [];
+  for (const sx of [1, -1]) {
+    const g = p.piece([sx * 2, -3, 0]);
+    const x = sx * MAIN_GEAR.x, py = lowerAt(x, MAIN_GEAR.z) + 0.6, r = 0.45;
+    p.anim.pivots.push(buildGear(p, g, new THREE.Vector3(x, py, MAIN_GEAR.z), py - GROUND_Y - r, r, [-0.32, 0.32]));
+  }
+});
+
+// Pintu (roda & bom): panel mengikuti permukaan bawah, berengsel di tepi luar
+function addDoorPair(p, parent, x0, x1, z0, z1, list) {
+  p.mesh(parent, surfacePatch(x0, x1, z0, z1, -0.005), M.bay, { polygonOffset: -2 });
+  const xm = (x0 + x1) / 2;
+  for (const [hx, ox, sign] of [[x0, xm, -1], [x1, xm, 1]]) {
+    const geo = surfacePatch(Math.min(hx, ox), Math.max(hx, ox), z0, z1, -0.035);
+    const hy = lowerAt(hx, (z0 + z1) / 2) - 0.035;
+    geo.translate(-hx, -hy, 0);
+    const pivot = new THREE.Group(); pivot.position.set(hx, hy, 0); parent.add(pivot);
+    p.mesh(pivot, geo, M.door, { polygonOffset: -4 });
+    list.push({ pivot, sign });
+  }
+}
+addPart({
+  id: 'gear-doors', cat: 'gear', name: 'Pintu Ruang Roda',
+  desc: 'Pintu ruang roda dengan tepi bergerigi (sawtooth). Saat tertutup, tepinya sejajar dengan garis utama planform agar tidak menimbulkan pantulan radar tambahan.',
+  specs: [['Jumlah', '6 panel'], ['Tepi', 'Bergerigi (sawtooth)']],
+}, p => {
+  p.anim.doors = [];
+  addDoorPair(p, p.piece([0, -1.5, 1.5]), -0.5, 0.5, -4.2, -7.1, p.anim.doors);
+  for (const sx of [1, -1]) {
+    const x = sx * MAIN_GEAR.x;
+    addDoorPair(p, p.piece([sx * 2, -1.5, 0]), x - 0.6, x + 0.6, -9.35, -5.95, p.anim.doors);
+  }
+});
+
+// ---- Senjata ----
+const BAY = { x0: -1.35, x1: 1.35, z0: -7.3, z1: -12.4 };
+addPart({
+  id: 'bomb-doors', cat: 'weapons', name: 'Pintu Ruang Senjata',
+  desc: 'Pintu ruang senjata internal. Semua senjata dibawa di dalam badan agar penampang radar tetap kecil — pintu hanya terbuka sesaat ketika melepas muatan.',
+  specs: [['Ruang senjata', '1 (model)'], ['Panjang', '5,1 m'], ['Lebar', '2,7 m']],
+}, p => {
+  p.anim.doors = [];
+  addDoorPair(p, p.piece([0, -2.5, 0]), BAY.x0, BAY.x1, BAY.z0, BAY.z1, p.anim.doors);
+});
+
+addPart({
+  id: 'launcher', cat: 'weapons', name: 'Peluncur Putar & Muatan',
+  desc: 'Peluncur putar (rotary launcher) berisi 8 senjata yang bergiliran berputar ke posisi lepas. B-21 dirancang membawa senjata konvensional maupun nuklir (mis. B61-12, JASSM-ER).',
+  specs: [['Kapasitas (model)', '8 senjata'], ['Muatan', 'Konvensional & nuklir'], ['Panjang senjata', '3,6 m']],
+}, p => {
+  const g = p.piece([0, -4.5, 0]);
+  const rot = new THREE.Group();
+  const zc = (BAY.z0 + BAY.z1) / 2;
+  rot.position.set(0, -0.1, zc); g.add(rot);
+  p.mesh(rot, new THREE.CylinderGeometry(0.1, 0.1, 4.6, 16).rotateX(Math.PI / 2), M.metal);
+  for (const z of [-1.8, 0, 1.8]) p.mesh(rot, new THREE.CylinderGeometry(0.36, 0.36, 0.08, 8).rotateX(Math.PI / 2).translate(0, 0, z), M.titan);
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2;
+    const b = new THREE.Group(); b.position.set(Math.cos(a) * 0.46, Math.sin(a) * 0.46, 0); rot.add(b);
+    (p.anim.bombs ||= []).push(b);
+    p.mesh(b, new THREE.CylinderGeometry(0.15, 0.15, 2.8, 16).rotateX(Math.PI / 2), M.bomb);
+    p.mesh(b, new THREE.ConeGeometry(0.15, 0.6, 16).rotateX(Math.PI / 2).translate(0, 0, 1.7), M.bomb);
+    for (let f = 0; f < 4; f++) {
+      const fin = p.mesh(b, new THREE.BoxGeometry(0.02, 0.17, 0.35), M.metal);
+      const fa = f / 4 * Math.PI * 2 + Math.PI / 4;
+      fin.position.set(Math.cos(fa) * 0.18, Math.sin(fa) * 0.18, -1.35); fin.rotation.z = fa - Math.PI / 2;
+    }
+  }
+  p.anim.rot = rot; p.anim.baseY = -0.1; p.anim.targetRot = 0;
+});
+
+// ---- Bahan bakar ----
+addPart({
+  id: 'fuel', cat: 'fuel', name: 'Tangki Bahan Bakar',
+  desc: 'Tangki terintegrasi di sayap dan badan tengah. Volume internal yang besar dari desain sayap terbang memberi jangkauan antarbenua; dapat diisi ulang di udara.',
+  specs: [['Tangki (model)', '5'], ['Pengisian', 'Isi ulang di udara (boom)'], ['Jangkauan', 'Antarbenua*']],
+}, p => {
+  const tank = (parent, x0, x1, u) => {
+    const xm = (x0 + x1) / 2, zm = zAt(xm, u);
+    const th = Math.min(thick(x1, u), thick(x0, u));
+    const r = th * 0.36, len = Math.abs(x1 - x0);
+    const holder = new THREE.Group();
+    holder.position.set(xm, midAt(xm, zm), zm);
+    const dz = zAt(x1, u) - zAt(x0, u);
+    holder.rotation.y = Math.atan2(-dz, x1 - x0);
+    parent.add(holder);
+    const m = p.mesh(holder, new THREE.CapsuleGeometry(r, Math.max(0.1, len - 2 * r), 8, 20), M.tank);
+    m.rotation.z = Math.PI / 2; m.scale.set(1, 1, 2.2);
+  };
+  for (const sx of [1, -1]) {
+    const g = p.piece([sx * 5, 2, 0]);
+    tank(g, sx * 7.8, sx * 12.6, 0.42);
+    tank(g, sx * 13.0, sx * 17.6, 0.42);
+  }
+  const c = p.piece([0, 2, -3]);
+  tank(c, -2.3, 2.3, 0.78);
+});
+
+// ---- Avionik ----
+addPart({
+  id: 'radar', cat: 'avionics', name: 'Radar AESA (Leading Edge)',
+  desc: 'Antena radar pemindai elektronik aktif (AESA) yang tertanam di leading edge sayap, untuk navigasi, pemetaan darat, dan penargetan dengan emisi probabilitas-intersepsi-rendah.',
+  specs: [['Tipe', 'AESA, LPI'], ['Lokasi', 'Leading edge kiri & kanan'], ['Fungsi', 'Pemetaan SAR, penargetan']],
+}, p => {
+  for (const sx of [1, -1]) {
+    const g = p.piece([sx * 2.5, 0.5, 4]);
+    const x = sx * 6.2, u = 0.07, z = zAt(x, u);
+    const holder = new THREE.Group(); holder.position.set(x, midAt(x, z), z);
+    holder.rotation.y = sx * Math.atan(LE_SLOPE * 0.95); g.add(holder);
+    p.mesh(holder, new THREE.BoxGeometry(3.0, thick(x, u) * 0.7, 0.08), M.radar);
+    for (let i = -6; i <= 6; i++) {
+      const t = p.mesh(holder, new THREE.BoxGeometry(0.16, thick(x, u) * 0.5, 0.02), M.pcb);
+      t.position.set(i * 0.22, 0, 0.05);
+    }
+  }
+});
+
+addPart({
+  id: 'avionics', cat: 'avionics', name: 'Rak Avionik & Komputer Misi',
+  desc: 'Sistem misi berarsitektur terbuka (open systems architecture) sehingga perangkat lunak & sensor baru bisa ditambahkan dengan cepat. Termasuk komunikasi, peperangan elektronik, dan sensor pasif.',
+  specs: [['Arsitektur', 'Open Mission Systems'], ['Lokasi', 'Hidung & belakang kokpit'], ['Sistem', 'Komunikasi, EW, ESM']],
+}, p => {
+  const g = p.piece([0, 3, 4]);
+  for (let i = 0; i < 4; i++) {
+    const x = -0.9 + i * 0.6;
+    p.mesh(g, new THREE.BoxGeometry(0.5, 0.55, 0.9).translate(x, 0.35, -1.9), i % 2 ? M.avi : M.pcb);
+  }
+  for (let i = 0; i < 3; i++) {
+    p.mesh(g, new THREE.BoxGeometry(0.75, 0.5, 1.4).translate(-0.85 + i * 0.85, 1.25, -8.2), i === 1 ? M.pcb : M.avi);
+  }
+});
+
+/* =====================================================================
+   5. MODE TAMPILAN, VISIBILITAS, POTONGAN
+   ===================================================================== */
+const state = {
+  mode: 'solid', explode: 0, explodeT: 0,
+  gear: 1, gearT: 1, bay: 0, bayT: 0,
+  engine: false, labels: false,
+  clipAxis: 'off', clip: 50,
+  selected: null, hovered: null,
+};
+
+function applyMode() {
+  for (const r of matRecords) {
+    const m = r.mat;
+    m.wireframe = state.mode === 'wire';
+    if (state.mode === 'color' && !r.keepColor) m.color.set(catById[r.part.cat].color);
+    else m.color.copy(r.baseColor);
+    const xr = state.mode === 'xray' && r.skin;
+    m.transparent = xr;
+    m.opacity = xr ? 0.1 : 1;
+    m.depthWrite = !xr;
+    m.needsUpdate = true;
+  }
+  refreshHighlight();
+}
+
+function refreshHighlight() {
+  const HL_SEL = new THREE.Color(0x1f6fd1), HL_HOV = new THREE.Color(0x24384d);
+  for (const r of matRecords) {
+    const id = r.part.id;
+    if (id === state.selected) r.mat.emissive.copy(HL_SEL).multiplyScalar(0.55);
+    else if (id === state.hovered) r.mat.emissive.copy(HL_HOV);
+    else r.mat.emissive.copy(r.baseEmissive);
+  }
+  parts.forEach(p => p.label.element.classList.toggle('selected', p.id === state.selected));
+}
+
+const BOUNDS = { z: [-11.5, 9], x: [-22, 22], y: [-3.2, 3.2] };
+function updateClipPlane() {
+  if (state.clipAxis === 'off') return;
+  const [a, b] = BOUNDS[state.clipAxis];
+  const v = b - (b - a) * state.clip / 100;
+  const n = { z: [0, 0, -1], x: [-1, 0, 0], y: [0, -1, 0] }[state.clipAxis];
+  clipPlane.normal.set(...n);
+  clipPlane.constant = v + (state.clipAxis === 'y' ? rig.position.y : 0);
+}
+function applyClip() {
+  const on = state.clipAxis !== 'off';
+  updateClipPlane();
+  for (const r of matRecords) { r.mat.clippingPlanes = on ? [clipPlane] : null; r.mat.clipShadows = true; r.mat.needsUpdate = true; }
+}
+
+function setVisible(id, vis) {
+  partById[id].group.visible = vis;
+  syncTree(); syncLabels();
+}
+function syncLabels() {
+  parts.forEach(p => { p.label.visible = state.labels && p.group.visible; });
+}
+
+/* =====================================================================
+   6. PANEL KOMPONEN (pohon)
+   ===================================================================== */
+const tree = document.getElementById('tree');
+const itemEls = {}, catEls = {};
+for (const c of CATEGORIES) {
+  const list = parts.filter(p => p.cat === c.id);
+  if (!list.length) continue;
+  const wrap = document.createElement('div'); wrap.className = 'cat';
+  wrap.innerHTML = `
+    <div class="cat-head">
+      <input type="checkbox" class="vis" checked>
+      <span class="cat-dot" style="background:${c.color}"></span>
+      <span class="cat-name">${c.name}</span>
+      <span class="cat-count">${list.length}</span>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+    </div>
+    <div class="cat-items"></div>`;
+  const head = wrap.querySelector('.cat-head');
+  const cb = head.querySelector('input');
+  cb.addEventListener('click', e => e.stopPropagation());
+  cb.addEventListener('change', () => { list.forEach(p => p.group.visible = cb.checked); syncTree(); syncLabels(); });
+  head.addEventListener('click', () => wrap.classList.toggle('collapsed'));
+  const items = wrap.querySelector('.cat-items');
+  for (const p of list) {
+    const it = document.createElement('div'); it.className = 'item';
+    it.innerHTML = `<input type="checkbox" class="vis" checked><span class="item-name"></span>`;
+    it.querySelector('.item-name').textContent = p.name;
+    const icb = it.querySelector('input');
+    icb.addEventListener('click', e => e.stopPropagation());
+    icb.addEventListener('change', () => setVisible(p.id, icb.checked));
+    it.addEventListener('click', () => selectPart(p.id, true));
+    items.appendChild(it);
+    itemEls[p.id] = it;
+  }
+  catEls[c.id] = { wrap, cb, list };
+  tree.appendChild(wrap);
+}
+function syncTree() {
+  for (const p of parts) {
+    const el = itemEls[p.id];
+    el.querySelector('input').checked = p.group.visible;
+    el.classList.toggle('hidden-part', !p.group.visible);
+    el.classList.toggle('selected', p.id === state.selected);
+  }
+  for (const { cb, list } of Object.values(catEls)) {
+    const n = list.filter(p => p.group.visible).length;
+    cb.checked = n === list.length; cb.indeterminate = n > 0 && n < list.length;
+  }
+}
+document.getElementById('search').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  for (const { wrap, list } of Object.values(catEls)) {
+    let any = false;
+    for (const p of list) {
+      const hit = !q || p.name.toLowerCase().includes(q) || catById[p.cat].name.toLowerCase().includes(q);
+      itemEls[p.id].style.display = hit ? '' : 'none';
+      any ||= hit;
+    }
+    wrap.style.display = any ? '' : 'none';
+    if (q) wrap.classList.remove('collapsed');
+  }
+});
+document.getElementById('btnShowAll').addEventListener('click', () => {
+  parts.forEach(p => p.group.visible = true); syncTree(); syncLabels();
+});
+
+let tris = 0;
+aircraft.traverse(o => { if (o.isMesh) { const g = o.geometry; tris += (g.index ? g.index.count : g.attributes.position.count) / 3; } });
+document.getElementById('statParts').textContent = `${parts.length} komponen`;
+document.getElementById('statTris').textContent = `${Math.round(tris).toLocaleString('id-ID')} segitiga`;
+
+/* =====================================================================
+   7. DETAIL KOMPONEN & SELEKSI
+   ===================================================================== */
+const infoEl = document.getElementById('info');
+function renderInfo() {
+  const p = partById[state.selected];
+  if (!p) {
+    infoEl.innerHTML = `<h3>Detail Komponen</h3><div class="info-empty">Klik bagian pesawat atau pilih dari daftar untuk melihat detailnya.</div>`;
+    return;
+  }
+  const c = catById[p.cat];
+  infoEl.innerHTML = `
+    <h3>Detail Komponen</h3>
+    <span class="chip"><span class="cat-dot" style="background:${c.color}"></span>${c.name}</span>
+    <div class="info-name"></div>
+    <p class="info-desc"></p>
+    <dl class="specs">${p.specs.map(() => '<dt></dt><dd></dd>').join('')}</dl>
+    <div class="info-actions">
+      <button class="icon-btn" data-act="focus">Fokus</button>
+      <button class="icon-btn" data-act="isolate">Isolasi</button>
+      <button class="icon-btn" data-act="hide">Sembunyikan</button>
+      <button class="icon-btn" data-act="close">Tutup</button>
+    </div>`;
+  infoEl.querySelector('.info-name').textContent = p.name;
+  infoEl.querySelector('.info-desc').textContent = p.desc;
+  const dts = infoEl.querySelectorAll('dt'), dds = infoEl.querySelectorAll('dd');
+  p.specs.forEach(([k, v], i) => { dts[i].textContent = k; dds[i].textContent = v; });
+  infoEl.querySelector('[data-act="focus"]').onclick = () => focusPart(p);
+  infoEl.querySelector('[data-act="isolate"]').onclick = () => {
+    parts.forEach(q => q.group.visible = q === p); syncTree(); syncLabels(); focusPart(p);
+  };
+  infoEl.querySelector('[data-act="hide"]').onclick = () => { setVisible(p.id, false); selectPart(null); };
+  infoEl.querySelector('[data-act="close"]').onclick = () => selectPart(null);
+}
+function selectPart(id, focus = false) {
+  state.selected = id;
+  refreshHighlight(); syncTree(); renderInfo();
+  if (id) {
+    itemEls[id].scrollIntoView({ block: 'nearest' });
+    if (focus) focusPart(partById[id]);
+    if (innerWidth <= 900 && focus) openPanel('side');
+  }
+}
+
+/* =====================================================================
+   8. KAMERA
+   ===================================================================== */
+let camTween = null;
+function tweenCamera(pos, target, dur = 0.9) {
+  camTween = { t: 0, dur, p0: camera.position.clone(), t0: controls.target.clone(), p1: pos.clone(), t1: target.clone() };
+}
+function focusPart(p) {
+  const box = new THREE.Box3().setFromObject(p.group);
+  if (box.isEmpty()) return;
+  const c = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3()).length();
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  tweenCamera(c.clone().add(dir.multiplyScalar(Math.max(6, size * 1.4))), c);
+}
+const VIEWS = {
+  iso:    [[40, 26, 44], [0, -0.5, 0]],
+  top:    [[0, 62, 0.01], [0, 0, 0]],
+  bottom: [[0, -50, 0.01], [0, 0, 0]],
+  front:  [[0, 3, 52], [0, 0, 0]],
+  side:   [[55, 2, 0], [0, 0, 0]],
+  rear:   [[0, 9, -50], [0, 0, 0]],
+};
+function setView(name, instant = false) {
+  const [p, t] = VIEWS[name];
+  const oy = rig.position.y;
+  const P1 = new THREE.Vector3(p[0], p[1] + oy, p[2]), T1 = new THREE.Vector3(t[0], t[1] + oy, t[2]);
+  if (instant) { camera.position.copy(P1); controls.target.copy(T1); controls.update(); }
+  else tweenCamera(P1, T1);
+}
+setView('iso', true);
+// tautan tampilan: #cam=x,y,z,tx,ty,tz&mode=xray&explode=50
+const hashParams = new URLSearchParams(location.hash.slice(1));
+if (hashParams.get('cam')) {
+  const v = hashParams.get('cam').split(',').map(Number);
+  if (v.length === 6 && v.every(Number.isFinite)) { camera.position.set(v[0], v[1], v[2]); controls.target.set(v[3], v[4], v[5]); controls.update(); }
+}
+
+/* =====================================================================
+   9. INTERAKSI (hover, klik, kontrol UI)
+   ===================================================================== */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const tooltip = document.getElementById('tooltip');
+
+function isShown(o) { while (o) { if (!o.visible) return false; o = o.parent; } return true; }
+function pick(clientX, clientY) {
+  pointer.set(clientX / innerWidth * 2 - 1, -(clientY / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObject(aircraft, true);
+  for (const h of hits) {
+    if (!h.object.isMesh || !isShown(h.object)) continue;
+    const part = partById[h.object.userData.partId];
+    if (!part) continue;
+    if (state.mode === 'xray' && h.object.material.transparent) continue;
+    if (state.clipAxis !== 'off' && clipPlane.distanceToPoint(h.point) < 0) continue;
+    return part;
+  }
+  return null;
+}
+
+let down = null, hoverQueued = null;
+renderer.domElement.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!down || e.button !== 0) return;
+  const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+  down = null;
+  if (moved > 5) return;
+  const p = pick(e.clientX, e.clientY);
+  selectPart(p ? p.id : null);
+});
+renderer.domElement.addEventListener('dblclick', e => {
+  const p = pick(e.clientX, e.clientY);
+  if (p) selectPart(p.id, true);
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse') return;
+  hoverQueued = { x: e.clientX, y: e.clientY };
+});
+renderer.domElement.addEventListener('pointerleave', () => { hoverQueued = null; setHover(null); });
+function setHover(p, x, y) {
+  const id = p ? p.id : null;
+  if (id !== state.hovered) { state.hovered = id; refreshHighlight(); }
+  renderer.domElement.style.cursor = p ? 'pointer' : '';
+  if (p) {
+    tooltip.innerHTML = `${p.name}<small>${catById[p.cat].name}</small>`;
+    tooltip.style.left = Math.min(x + 14, innerWidth - tooltip.offsetWidth - 8) + 'px';
+    tooltip.style.top = (y + 16) + 'px';
+    tooltip.style.opacity = 1;
+  } else tooltip.style.opacity = 0;
+}
+
+document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#modeSeg button').forEach(x => x.classList.toggle('active', x === b));
+  state.mode = b.dataset.mode; applyMode();
+}));
+const explodeEl = document.getElementById('explode');
+explodeEl.addEventListener('input', () => {
+  state.explode = explodeEl.value / 100;
+  document.getElementById('explodeVal').textContent = explodeEl.value + '%';
+});
+const clipEl = document.getElementById('clip'), clipAxisEl = document.getElementById('clipAxis');
+clipAxisEl.addEventListener('change', () => { state.clipAxis = clipAxisEl.value; clipEl.disabled = state.clipAxis === 'off'; applyClip(); });
+clipEl.addEventListener('input', () => { state.clip = +clipEl.value; applyClip(); });
+
+const bind = (id, fn) => { const el = document.getElementById(id); el.addEventListener('change', () => fn(el.checked)); };
+bind('tLabels', v => { state.labels = v; syncLabels(); });
+bind('tGear', v => { state.gear = v ? 1 : 0; });
+bind('tBay', v => { state.bay = v ? 1 : 0; });
+bind('tEngine', v => { state.engine = v; });
+bind('tRotate', v => { controls.autoRotate = v; controls.autoRotateSpeed = 0.8; });
+bind('tGrid', v => { grid.visible = v; });
+
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+document.getElementById('btnReset').addEventListener('click', () => {
+  explodeEl.value = 0; explodeEl.dispatchEvent(new Event('input'));
+  clipAxisEl.value = 'off'; clipAxisEl.dispatchEvent(new Event('change'));
+  parts.forEach(p => p.group.visible = true); syncTree(); syncLabels();
+  selectPart(null); setView('iso');
+});
+document.getElementById('btnShot').addEventListener('click', () => {
+  renderer.render(scene, camera);
+  const a = document.createElement('a');
+  a.href = renderer.domElement.toDataURL('image/png');
+  a.download = 'b21-raider-3d.png';
+  a.click();
+});
+
+const panels = { parts: document.getElementById('partsPanel'), side: document.getElementById('sidePanel') };
+function openPanel(name) {
+  for (const [k, el] of Object.entries(panels)) el.classList.toggle('open', k === name ? !el.classList.contains('open') || name === 'side' : false);
+}
+document.getElementById('btnParts').addEventListener('click', () => openPanel('parts'));
+document.getElementById('btnSide').addEventListener('click', () => {
+  const el = panels.side; const was = el.classList.contains('open');
+  panels.parts.classList.remove('open'); el.classList.toggle('open', !was);
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); labelRenderer.setSize(innerWidth, innerHeight);
+});
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'Escape') selectPart(null);
+  if (e.key === 'f' && state.selected) focusPart(partById[state.selected]);
+  if (e.key === 't' || e.key === 'T') setFlight(!flight.on);
+  if (e.key === 'r' || e.key === 'R') reloadWeapons();
+  if (e.code === 'Space') { e.preventDefault(); requestLaunch(1); }
+});
+
+
+/* =====================================================================
+   10. SIMULASI TERBANG & PELUNCURAN SENJATA
+   ===================================================================== */
+const FLY_SPEED = 32, FLY_ALT = 18;
+const flight = { on: false, speed: 0, alt: 0, pitch: 0, t: 0, dist: 0 };
+const btnFly = document.getElementById('btnFly');
+const toastEl = document.getElementById('toast');
+let toastTimer;
+function toast(msg) {
+  toastEl.textContent = msg; toastEl.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2800);
+}
+function setCheck(id, v) { const el = document.getElementById(id); if (el.checked !== v) el.checked = v; }
+
+function setFlight(on) {
+  flight.on = on;
+  btnFly.classList.toggle('active', on);
+  btnFly.querySelector('span').textContent = on ? 'Mendarat' : 'Lepas Landas';
+  if (!on) weapons.pending = 0;
+  toast(on ? 'Lepas landas — roda pendarat akan naik otomatis' : 'Mendarat — roda pendarat diturunkan');
+}
+
+// --- Awan ---
+const cloudMat = new THREE.MeshStandardMaterial({ color: 0xf1f4f7, roughness: 1, metalness: 0, flatShading: true, transparent: true, opacity: 0 });
+const cloudGeo = new THREE.IcosahedronGeometry(1, 1);
+const clouds = new THREE.Group(); clouds.visible = false; scene.add(clouds);
+function placeCloud(c, z) {
+  let x, y;
+  // awan di bawah pesawat, menjauh dari jalur jatuh senjata
+  do { x = (Math.random() * 2 - 1) * 120; y = GROUND_Y + 4 + Math.random() * 13; }
+  while (Math.abs(x) < 26);
+  c.position.set(x, y, z);
+}
+for (let i = 0; i < 24; i++) {
+  const c = new THREE.Group();
+  const n = 5 + Math.floor(Math.random() * 5);
+  for (let k = 0; k < n; k++) {
+    const m = new THREE.Mesh(cloudGeo, cloudMat);
+    const s = 2.5 + Math.random() * 4;
+    m.scale.set(s * 1.4, s * 0.75, s);
+    m.position.set((Math.random() - 0.5) * 14, Math.random() * 2.5, (Math.random() - 0.5) * 9);
+    c.add(m);
+  }
+  placeCloud(c, (Math.random() * 2 - 1) * 170);
+  clouds.add(c);
+}
+
+const hudEl = document.getElementById('hud'), hintEl = document.querySelector('.hint');
+const hudStatus = document.getElementById('hudStatus'), hudAlt = document.getElementById('hudAlt');
+const hudSpd = document.getElementById('hudSpd'), hudAmmo = document.getElementById('hudAmmo');
+
+function updateFlight(dt) {
+  flight.t += dt;
+  let altTarget = 0;
+  if (flight.on) {
+    flight.speed = approach(flight.speed, FLY_SPEED, 0.45, dt);
+    if (flight.speed > FLY_SPEED * 0.6) altTarget = FLY_ALT;
+  } else {
+    const airborne = flight.alt > 0.3;
+    flight.speed = approach(flight.speed, airborne ? FLY_SPEED * 0.7 : 0, airborne ? 0.5 : 0.8, dt);
+    if (flight.speed < 0.05) flight.speed = 0;
+  }
+  const prevAlt = flight.alt;
+  flight.alt = approach(flight.alt, altTarget, flight.on ? 0.3 : 0.45, dt);
+  if (!flight.on && flight.alt < 0.04) flight.alt = 0;
+  const climb = (flight.alt - prevAlt) / Math.max(dt, 1e-4);
+  flight.pitch = approach(flight.pitch, clamp(climb * 0.05, -0.08, 0.2), 3, dt);
+
+  const k = clamp(flight.alt / FLY_ALT, 0, 1);
+  const prevY = rig.position.y;
+  rig.position.y = flight.alt + Math.sin(flight.t * 1.3) * 0.18 * k;
+  rig.rotation.x = -flight.pitch;
+  rig.rotation.z = Math.sin(flight.t * 0.35) * 0.09 * k;
+
+  // roda otomatis
+  if (flight.on && flight.alt > 1.5 && state.gear) { state.gear = 0; setCheck('tGear', false); }
+  if (!flight.on && flight.alt > 0.01 && flight.alt < 9 && !state.gear) { state.gear = 1; setCheck('tGear', true); }
+
+  // dunia bergerak ke belakang (pesawat tetap di tengah)
+  flight.dist += flight.speed * dt;
+  grid.position.z = -(flight.dist % 2);
+  cloudMat.opacity = clamp(flight.alt / 8, 0, 1) * 0.85;
+  clouds.visible = cloudMat.opacity > 0.01;
+  for (const c of clouds.children) {
+    c.position.z -= flight.speed * dt;
+    if (c.position.z < -170) placeCloud(c, 170);
+  }
+
+  // kamera ikut naik/turun bersama pesawat
+  const dy = rig.position.y - prevY;
+  camera.position.y += dy; controls.target.y += dy;
+  if (camTween) for (const v of [camTween.p0, camTween.p1, camTween.t0, camTween.t1]) v.y += dy;
+
+  // HUD
+  const show = flight.on || flight.alt > 0.01 || flight.speed > 0.01;
+  hudEl.classList.toggle('show', show);
+  hintEl.style.display = show ? 'none' : '';
+  if (show) {
+    hudStatus.textContent = !flight.on ? (flight.alt > 0 ? 'MENDARAT' : 'TAXI')
+      : flight.alt < FLY_ALT * 0.9 ? 'LEPAS LANDAS' : 'JELAJAH';
+    hudAlt.textContent = (Math.round(flight.alt / FLY_ALT * 400) * 100).toLocaleString('id-ID');
+    hudSpd.textContent = Math.round(flight.speed / FLY_SPEED * 480);
+  }
+}
+
+// --- Senjata ---
+const launcher = partById['launcher'].anim;
+const weapons = { pending: 0, stage: 'idle', timer: 0, target: -1, autoBay: false, idle: 0 };
+const ammoEl = document.getElementById('ammo');
+const ammoLeft = () => launcher.bombs.filter(b => b.visible).length;
+function updateAmmo() { const t = ammoLeft() + '/8'; ammoEl.textContent = t; hudAmmo.textContent = t; }
+
+function requestLaunch(n) {
+  const avail = ammoLeft() - weapons.pending;
+  if (avail <= 0) { toast(ammoLeft() ? 'Senjata sedang diluncurkan…' : 'Senjata habis — tekan "Isi Ulang"'); return; }
+  weapons.pending += Math.min(n, avail);
+  if (flight.alt < FLY_ALT * 0.75) {
+    if (!flight.on) setFlight(true);
+    toast('Menunggu ketinggian jelajah… senjata akan diluncurkan otomatis');
+  }
+}
+function reloadWeapons() {
+  if (weapons.stage !== 'idle') { toast('Tunggu peluncuran selesai'); return; }
+  launcher.bombs.forEach(b => b.visible = true);
+  weapons.pending = 0; updateAmmo();
+  toast('Peluncur putar diisi ulang: 8 senjata');
+}
+const rotTargetFor = i => {
+  const cur = launcher.rot.rotation.z;
+  const t = -Math.PI / 2 - i * Math.PI / 4;        // posisi senjata ke-i di bawah
+  return t + Math.PI * 2 * Math.round((cur - t) / (Math.PI * 2));
+};
+
+function updateWeapons(dt) {
+  const air = flight.alt > FLY_ALT * 0.75;
+  const cancel = () => { weapons.stage = 'idle'; weapons.pending = 0; };
+  if (weapons.stage === 'idle' && weapons.pending > 0 && air) {
+    if (!state.bay) { state.bay = 1; setCheck('tBay', true); weapons.autoBay = true; }
+    weapons.stage = 'opening';
+  }
+  if (weapons.stage === 'opening') {
+    if (!state.bay) cancel();
+    else if (state.bayT >= 1) {
+      weapons.target = launcher.bombs.findIndex(b => b.visible);
+      if (weapons.target < 0) cancel();
+      else { launcher.targetRot = rotTargetFor(weapons.target); weapons.stage = 'rotating'; }
+    }
+  } else if (weapons.stage === 'rotating') {
+    if (!state.bay) cancel();
+    else if (Math.abs(launcher.rot.rotation.z - launcher.targetRot) < 0.015) {
+      releaseBomb(weapons.target);
+      weapons.pending = Math.max(0, weapons.pending - 1);
+      weapons.stage = 'cooldown'; weapons.timer = 0.45;
+    }
+  } else if (weapons.stage === 'cooldown') {
+    weapons.timer -= dt;
+    if (weapons.timer <= 0) weapons.stage = 'idle';
+  }
+  // tutup pintu otomatis setelah selesai
+  if (weapons.stage === 'idle' && !weapons.pending && weapons.autoBay) {
+    weapons.idle += dt;
+    if (weapons.idle > 2.5) { state.bay = 0; setCheck('tBay', false); weapons.autoBay = false; }
+  } else weapons.idle = 0;
+}
+
+// --- Efek: senjata jatuh, asap, ledakan ---
+const falling = [], puffs = [], blasts = [];
+const puffGeo = new THREE.IcosahedronGeometry(1, 1);
+const sphereGeo = new THREE.SphereGeometry(1, 24, 16);
+const ringGeo = new THREE.RingGeometry(0.85, 1, 64);
+const craterGeo = new THREE.CircleGeometry(1, 40);
+const flash = new THREE.PointLight(0xff8a3a, 0, 90, 1.5);
+scene.add(flash);
+let shake = 0;
+
+function releaseBomb(i) {
+  const b = launcher.bombs[i];
+  rig.updateMatrixWorld(true);
+  const w = b.clone(true);
+  b.getWorldPosition(w.position);
+  scene.add(w);
+  b.visible = false;
+  updateAmmo();
+  falling.push({ obj: w, vel: new THREE.Vector3((Math.random() - 0.5) * 5, -3, 0), roll: launcher.rot.rotation.z, trail: 0, age: 0 });
+}
+
+function spawnPuff(p, o = {}) {
+  const mat = new THREE.MeshBasicMaterial({ color: o.color ?? 0xc4c9cf, transparent: true, opacity: o.opacity ?? 0.5, depthWrite: false });
+  const m = new THREE.Mesh(puffGeo, mat);
+  const s = o.size ?? 0.22;
+  m.position.copy(p); m.scale.setScalar(s);
+  scene.add(m);
+  puffs.push({ m, age: 0, life: o.life ?? 1.3, grow: o.grow ?? 1.4, vel: o.vel ?? new THREE.Vector3(0, 0.3, 0), op: mat.opacity, s, gravityOn: !!o.gravity });
+}
+
+function spawnExplosion(p) {
+  const g = new THREE.Group(); g.position.copy(p); scene.add(g);
+  const add = (geo, color, additive) => {
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+      color, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+    }));
+    g.add(m); return m;
+  };
+  const crater = add(craterGeo, 0x0d0b09, false); crater.rotation.x = -Math.PI / 2; crater.position.y = GROUND_Y - p.y + 0.03; crater.scale.setScalar(3.4);
+  const ring = add(ringGeo, 0xffd9a0, true); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.08;
+  const fire = add(sphereGeo, 0xff6a14, true);
+  const core = add(sphereGeo, 0xfff1b8, true);
+  blasts.push({ g, crater, ring, fire, core, age: 0 });
+  flash.position.set(p.x, p.y + 4, p.z);
+  for (let i = 0; i < 16; i++) {
+    const a = Math.random() * Math.PI * 2, r = Math.random() * 2;
+    spawnPuff(new THREE.Vector3(p.x + Math.cos(a) * r, p.y + 0.5 + Math.random() * 2, p.z + Math.sin(a) * r), {
+      color: i < 6 ? 0x2e2a27 : 0x6d6761, opacity: 0.8, size: 1.1 + Math.random() * 1.2, grow: 1.5,
+      life: 4 + Math.random() * 2.5, vel: new THREE.Vector3(Math.cos(a) * 1.6, 2.5 + Math.random() * 3.5, Math.sin(a) * 1.6),
+    });
+  }
+  // percikan serpihan
+  for (let i = 0; i < 18; i++) {
+    const a = Math.random() * Math.PI * 2, up = 6 + Math.random() * 10, out = 4 + Math.random() * 6;
+    spawnPuff(new THREE.Vector3(p.x, p.y + 0.5, p.z), {
+      color: 0xffb060, opacity: 1, size: 0.15, grow: -0.6, life: 0.9 + Math.random() * 0.5,
+      vel: new THREE.Vector3(Math.cos(a) * out, up, Math.sin(a) * out), gravity: true,
+    });
+  }
+  shake = Math.min(1, shake + 0.7);
+  damageCity(p);
+}
+
+function disposeGroup(g) { g.traverse(o => { if (o.material) o.material.dispose(); }); scene.remove(g); }
+
+function updateEffects(dt) {
+  const scroll = flight.speed * dt;
+  for (let i = falling.length - 1; i >= 0; i--) {
+    const f = falling[i]; f.age += dt;
+    f.vel.y -= 14 * dt; f.vel.z -= 4 * dt;      // gravitasi + hambatan udara
+    f.obj.position.addScaledVector(f.vel, dt);
+    f.obj.rotation.set(Math.atan2(-f.vel.y, FLY_SPEED * 0.5), 0, f.roll);
+    f.obj.updateMatrixWorld();
+    f.trail -= dt;
+    if (f.trail <= 0 && f.age > 0.2) { f.trail = 0.012; spawnPuff(f.obj.localToWorld(new THREE.Vector3(0, 0, -1.6)), { size: 0.38, grow: 2.2, life: 1.6, opacity: 0.4 }); }
+    const fp = f.obj.position, roof = buildingAt(fp.x, fp.z);
+    if (fp.y <= GROUND_Y + 0.3 || (roof && fp.y <= GROUND_Y + roof.h)) {
+      spawnExplosion(new THREE.Vector3(fp.x, Math.max(GROUND_Y, fp.y), fp.z));
+      scene.remove(f.obj); falling.splice(i, 1);
+    }
+  }
+  updateCity(dt, scroll);
+  for (let i = puffs.length - 1; i >= 0; i--) {
+    const p = puffs[i]; p.age += dt;
+    if (p.gravityOn) p.vel.y -= 20 * dt;
+    p.m.position.addScaledVector(p.vel, dt);
+    p.m.position.z -= scroll;
+    if (p.m.position.y < GROUND_Y) p.m.position.y = GROUND_Y;
+    p.vel.multiplyScalar(Math.exp(-0.8 * dt));
+    const t = p.age / p.life;
+    p.m.scale.setScalar(Math.max(0.01, p.s * (1 + p.grow * p.age)));
+    p.m.material.opacity = p.op * (1 - t) * (1 - t);
+    if (t >= 1) { scene.remove(p.m); p.m.material.dispose(); puffs.splice(i, 1); }
+  }
+  for (let i = blasts.length - 1; i >= 0; i--) {
+    const b = blasts[i]; b.age += dt; const t = b.age;
+    b.g.position.z -= scroll;
+    b.fire.scale.setScalar(1 + 7 * (1 - Math.exp(-t * 5)));
+    b.fire.position.y = 1 + 3 * t;
+    b.fire.material.opacity = clamp(1 - t / 1.1, 0, 1);
+    b.core.scale.setScalar(0.6 + 4 * (1 - Math.exp(-t * 8)));
+    b.core.material.opacity = clamp(1 - t / 0.35, 0, 1);
+    b.ring.scale.setScalar(1 + 32 * t);
+    b.ring.material.opacity = clamp(0.9 * (1 - t / 0.9), 0, 1);
+    b.crater.material.opacity = clamp(0.85 * Math.min(1, t * 6) * (1 - (t - 6) / 2.5), 0, 0.85);
+    if (t > 8.5) { disposeGroup(b.g); blasts.splice(i, 1); }
+  }
+  // kilatan cahaya dari ledakan terakhir
+  const last = blasts[blasts.length - 1];
+  flash.intensity = last ? 6000 * Math.max(0, 1 - last.age / 0.6) ** 2 : 0;
+  if (last) flash.position.z = last.g.position.z;
+}
+
+// --- Kota di bawah jalur terbang (target simulasi bergaya game) ---
+const city = new THREE.Group(); scene.add(city);
+const winTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 64, 64);
+  g.fillStyle = '#39414d';
+  for (let y = 8; y < 64; y += 16) for (let x = 6; x < 64; x += 16) g.fillRect(x, y, 8, 9);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return t;
+})();
+const WALL_COLORS = [0xb9b2a6, 0x9aa3ad, 0xc8c0b0, 0x8d949c, 0xa89f92, 0x7f8a94];
+const wallMats = WALL_COLORS.map(c => new THREE.MeshStandardMaterial({ color: c, map: winTex, roughness: 0.85, metalness: 0.05 }));
+const chunkMats = WALL_COLORS.map(c => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).multiplyScalar(0.7), roughness: 0.95 }));
+const roofMat = new THREE.MeshStandardMaterial({ color: 0x4a4e54, roughness: 0.9 });
+const scorchMat = new THREE.MeshStandardMaterial({ color: 0x3a342e, map: winTex, roughness: 1 });
+const rubbleMat = new THREE.MeshStandardMaterial({ color: 0x2c2926, roughness: 1, flatShading: true });
+const unitBox = new THREE.BoxGeometry(1, 1, 1);
+const rubbleGeo = new THREE.DodecahedronGeometry(1, 0);
+const buildings = [], chunks = [];
+const BLAST_R = 16;          // radius efek (skala visual permainan, bukan data senjata nyata)
+const ROW_GAP = 14, CITY_FAR = 190;
+let cityFrontZ = CITY_FAR;
+
+function makeBuilding(x, z, w, d, h) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const uv = geo.attributes.uv;
+  for (let f = 0; f < 6; f++) {           // ukuran jendela ±3 m
+    const [su, sv] = f < 2 ? [d / 3, h / 3] : f < 4 ? [1, 1] : [w / 3, h / 3];
+    for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv); }
+  }
+  const ci = Math.floor(Math.random() * wallMats.length), wm = wallMats[ci];
+  const m = new THREE.Mesh(geo, [wm, wm, roofMat, roofMat, wm, wm]);
+  m.position.y = h / 2; m.castShadow = true; m.receiveShadow = true;
+  const g = new THREE.Group(); g.position.set(x, GROUND_Y, z); g.add(m); city.add(g);
+  buildings.push({ g, m, w, d, h, ci, state: 'ok', tilt: new THREE.Vector2() });
+}
+function makeRubble(x, z, w, d) {
+  const g = new THREE.Group(); g.position.set(x, GROUND_Y, z); city.add(g);
+  for (let i = 0; i < 5; i++) {
+    const r = new THREE.Mesh(rubbleGeo, rubbleMat);
+    r.scale.set(w * (0.25 + Math.random() * 0.2), 0.4 + Math.random() * 0.7, d * (0.25 + Math.random() * 0.2));
+    r.position.set((Math.random() - 0.5) * w * 0.6, 0, (Math.random() - 0.5) * d * 0.6);
+    r.rotation.y = Math.random() * Math.PI; r.receiveShadow = true;
+    g.add(r);
+  }
+  buildings.push({ g, m: null, w, d, h: 0.6, state: 'rubble', tilt: new THREE.Vector2() });
+}
+function spawnRow(z) {
+  for (let x = -62; x <= 62; x += 10 + Math.random() * 5) {
+    if (Math.random() < 0.32) continue;
+    const tall = Math.random() < 0.15;
+    makeBuilding(x + (Math.random() - 0.5) * 2, z + (Math.random() - 0.5) * 3,
+      4 + Math.random() * 4, 4 + Math.random() * 5, tall ? 10 + Math.random() * 4 : 3 + Math.random() * 6);
+  }
+}
+function removeBuilding(i) {
+  const b = buildings[i];
+  if (b.m) b.m.geometry.dispose();
+  city.remove(b.g); buildings.splice(i, 1);
+}
+function buildingAt(x, z) {
+  for (const b of buildings) {
+    if (b.state === 'gone' || b.state === 'rubble') continue;
+    if (Math.abs(x - b.g.position.x) < b.w / 2 && Math.abs(z - b.g.position.z) < b.d / 2) return b;
+  }
+  return null;
+}
+
+function shatter(b, p) {
+  b.state = 'gone';
+  const nx = 2, nz = 2, ny = clamp(Math.round(b.h / 2.5), 2, 6);
+  const sx = b.w / nx, sy = b.h / ny, sz = b.d / nz;
+  b.g.updateMatrixWorld();
+  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) for (let k = 0; k < nz; k++) {
+    const wp = new THREE.Vector3((i + 0.5) * sx - b.w / 2, (j + 0.5) * sy, (k + 0.5) * sz - b.d / 2).applyMatrix4(b.g.matrixWorld);
+    const m = new THREE.Mesh(unitBox, chunkMats[b.ci]);
+    m.scale.set(sx * 0.94, sy * 0.94, sz * 0.94);
+    m.position.copy(wp); m.quaternion.copy(b.g.quaternion); m.castShadow = true;
+    scene.add(m);
+    const dir = new THREE.Vector3(wp.x - p.x, 0, wp.z - p.z);
+    const dist = dir.length() || 1; dir.divideScalar(dist);
+    const power = clamp(1 - dist / BLAST_R, 0.2, 1);
+    const vel = dir.multiplyScalar(4 + 16 * power * (0.5 + Math.random() * 0.5))
+      .add(new THREE.Vector3(0, (3 + 9 * power * Math.random()) * (0.4 + j / ny), 0));
+    chunks.push({
+      m, vel, half: sy * 0.47, life: 7 + Math.random() * 2,
+      age: -Math.random() * 0.12,       // sedikit jeda agar runtuhnya tidak serempak
+      spin: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(8 * power),
+    });
+  }
+  const { x, z } = b.g.position;
+  for (let i = 0; i < 6; i++) {
+    spawnPuff(new THREE.Vector3(x + (Math.random() - 0.5) * b.w, GROUND_Y + 1 + Math.random() * b.h * 0.5, z + (Math.random() - 0.5) * b.d), {
+      color: 0x8a8278, opacity: 0.6, size: 1.6 + Math.random() * 1.5, grow: 0.9, life: 5 + Math.random() * 2,
+      vel: new THREE.Vector3((Math.random() - 0.5) * 2, 0.8 + Math.random() * 1.2, (Math.random() - 0.5) * 2),
+    });
+  }
+  removeBuilding(buildings.indexOf(b));
+  makeRubble(x, z, b.w, b.d);
+}
+
+function damageCity(p) {
+  for (const b of [...buildings]) {
+    if (b.state === 'gone' || b.state === 'rubble') continue;
+    const dx = b.g.position.x - p.x, dz = b.g.position.z - p.z, len = Math.hypot(dx, dz) || 1;
+    const dist = len - Math.max(b.w, b.d) * 0.5;
+    if (dist < BLAST_R * 0.55) shatter(b, p);
+    else if (dist < BLAST_R) {
+      // zona luar: miring menjauhi titik ledak, dinding hangus
+      const k = 1 - (dist - BLAST_R * 0.55) / (BLAST_R * 0.45);
+      const a = 0.06 + 0.22 * k;
+      b.tilt.set(clamp(b.tilt.x + a * dz / len, -0.35, 0.35), clamp(b.tilt.y - a * dx / len, -0.35, 0.35));
+      b.state = 'damaged';
+      b.m.material = [scorchMat, scorchMat, roofMat, roofMat, scorchMat, scorchMat];
+      spawnPuff(new THREE.Vector3(b.g.position.x, GROUND_Y + b.h * 0.6, b.g.position.z), {
+        color: 0x6d6761, opacity: 0.5, size: 1.4, grow: 1, life: 3.5, vel: new THREE.Vector3(dx / len * 2, 1.2, dz / len * 2),
+      });
+    }
+  }
+}
+
+function updateCity(dt, scroll) {
+  const spawning = flight.alt > 6;
+  cityFrontZ -= scroll;
+  if (!spawning) cityFrontZ = Math.max(cityFrontZ, CITY_FAR);
+  while (spawning && cityFrontZ < CITY_FAR) { cityFrontZ += ROW_GAP; spawnRow(cityFrontZ); }
+
+  for (let i = buildings.length - 1; i >= 0; i--) {
+    const b = buildings[i];
+    b.g.position.z -= scroll;
+    if (b.state === 'damaged') {
+      b.g.rotation.x = approach(b.g.rotation.x, b.tilt.x, 5, dt);
+      b.g.rotation.z = approach(b.g.rotation.z, b.tilt.y, 5, dt);
+    }
+    // saat mendarat, kota di kejauhan tenggelam agar tidak menghalangi landasan
+    if (!flight.on && !spawning && b.g.position.z > 25) b.g.position.y -= dt * 10;
+    if (b.g.position.z < -150 || b.g.position.y < GROUND_Y - 16) removeBuilding(i);
+  }
+
+  for (let i = chunks.length - 1; i >= 0; i--) {
+    const c = chunks[i]; c.age += dt;
+    c.m.position.z -= scroll;
+    if (c.age > 0) {
+      c.vel.y -= 20 * dt;
+      c.m.position.addScaledVector(c.vel, dt);
+      c.m.rotation.x += c.spin.x * dt; c.m.rotation.y += c.spin.y * dt; c.m.rotation.z += c.spin.z * dt;
+      const floor = GROUND_Y + c.half * 0.6;
+      if (c.m.position.y < floor) {
+        c.m.position.y = floor;
+        if (c.vel.y < 0) c.vel.y *= -0.3;
+        c.vel.x *= 0.6; c.vel.z *= 0.6; c.spin.multiplyScalar(0.55);
+      }
+    }
+    if (c.age > c.life || c.m.position.z < -150) { scene.remove(c.m); chunks.splice(i, 1); }
+  }
+}
+
+btnFly.addEventListener('click', () => setFlight(!flight.on));
+document.getElementById('btnFire').addEventListener('click', () => requestLaunch(1));
+document.getElementById('btnSalvo').addEventListener('click', () => requestLaunch(8));
+document.getElementById('btnReload').addEventListener('click', reloadWeapons);
+
+
+/* =====================================================================
+   11. LOOP ANIMASI
+   ===================================================================== */
+const clock = new THREE.Clock();
+const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const approach = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
+
+function updateAnimations(dt) {
+  state.explodeT = approach(state.explodeT, state.explode, 10, dt);
+  for (const p of parts) for (const g of p.pieces) g.position.copy(g.userData.explode).multiplyScalar(state.explodeT);
+
+  // roda pendarat: 1 = turun, 0 = naik
+  state.gearT = clamp(state.gearT + Math.sign(state.gear - state.gearT) * dt * 0.6, 0, 1);
+  const g = ease(state.gearT), fold = (1 - g) * Math.PI / 2;
+  partById['nose-gear'].anim.pivot.rotation.x = fold;
+  partById['main-gear'].anim.pivots.forEach(pv => pv.rotation.x = -fold);
+  const doorOpen = clamp(state.gearT * 4, 0, 1);
+  partById['gear-doors'].anim.doors.forEach(d => d.pivot.rotation.z = d.sign * ease(doorOpen) * 1.5);
+
+  // ruang senjata
+  state.bayT = clamp(state.bayT + Math.sign(state.bay - state.bayT) * dt * 0.7, 0, 1);
+  const b = ease(state.bayT);
+  partById['bomb-doors'].anim.doors.forEach(d => d.pivot.rotation.z = d.sign * clamp(b * 1.6, 0, 1) * 1.55);
+  const L = partById['launcher'].anim;
+  L.rot.position.y = L.baseY - clamp(b * 1.6 - 0.6, 0, 1) * 1.05;
+  L.rot.rotation.z = approach(L.rot.rotation.z, L.targetRot, 6, dt);
+
+  // kipas mesin
+  if (state.engine || flight.on || flight.speed > 0.1) partById['engines'].anim.fans.forEach(f => f.rotation.z += dt * 25);
+}
+
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (camTween) {
+    camTween.t += dt / camTween.dur;
+    const k = ease(Math.min(1, camTween.t));
+    camera.position.lerpVectors(camTween.p0, camTween.p1, k);
+    controls.target.lerpVectors(camTween.t0, camTween.t1, k);
+    if (camTween.t >= 1) camTween = null;
+  }
+  updateFlight(dt);
+  updateWeapons(dt);
+  updateAnimations(dt);
+  updateEffects(dt);
+  updateClipPlane();
+  controls.update();
+  if (hoverQueued) { const h = hoverQueued; hoverQueued = null; setHover(pick(h.x, h.y), h.x, h.y); }
+  shake = Math.max(0, shake - dt * 1.4);
+  const so = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(shake * shake * 0.8);
+  camera.position.add(so);
+  renderer.render(scene, camera);
+  camera.position.sub(so);
+  labelRenderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+
+applyMode(); applyClip(); syncTree();
+if (hashParams.get('mode')) document.querySelector(`#modeSeg [data-mode="${hashParams.get('mode')}"]`)?.click();
+if (hashParams.get('bay') === '1') document.getElementById('tBay').click();
+if (hashParams.get('fly') === '1') setFlight(true);
+if (hashParams.get('fire')) requestLaunch(+hashParams.get('fire'));
+if (hashParams.get('explode')) { explodeEl.value = +hashParams.get('explode'); explodeEl.dispatchEvent(new Event('input')); state.explodeT = state.explode; }
+tick();
+requestAnimationFrame(() => document.getElementById('loading').classList.add('done'));
+</script>
+</body>
+</html>
